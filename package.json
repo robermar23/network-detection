@@ -5,8 +5,9 @@
   "type": "module",
   "main": "src/main/main.js",
   "scripts": {
-    "dev": "concurrently -k \"vite\" \"cross-env NODE_ENV=development electron .\"",
-    "build": "vite build",
+    "build:preload": "esbuild src/main/preload.js --bundle --format=cjs --outfile=src/main/preload.cjs --external:electron",
+    "dev": "npm run build:preload && concurrently -k \"vite\" \"cross-env NODE_ENV=development electron .\"",
+    "build": "npm run build:preload && vite build",
     "preview": "vite preview",
     "test": "vitest run --dir ./test"
   },

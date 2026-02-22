@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
-import { autoUpdater } from 'electron-updater';
+import pkg from 'electron-updater';
+const { autoUpdater } = pkg;
 import { IPC_CHANNELS } from '../shared/ipc.js';
 import path from 'path';
 import { fileURLToPath } from 'url';

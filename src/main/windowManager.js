@@ -31,7 +31,7 @@ export function createMainWindow(isDev, resolvePath, webURL) {
       height: 35
     },
     webPreferences: {
-      preload: resolvePath('preload.js'),
+      preload: resolvePath('preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
     },

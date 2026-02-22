@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws://localhost:5173" />
+    <title>Network Detection Dashboard</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <!-- Custom Titlebar Drag Overlay -->
+    <div class="titlebar-drag-region"></div>
+
+    <div class="app-container">
+      
+      <!-- Header / Controls -->
+      <header class="glass-panel main-header">
+        <div class="header-titles">
+          <h1>Network Observer</h1>
+          <p class="subtitle" id="status-text">Ready to scan.</p>
+        </div>
+        
+        <div class="control-group">
+          <button id="btn-scan" class="btn primary">
+            <span class="icon">🔍</span> Scan Network
+          </button>
+          <button id="btn-stop" class="btn danger" disabled>
+            <span class="icon">🛑</span> Stop
+          </button>
+          <div class="divider"></div>
+          <button id="btn-save" class="btn secondary">Save</button>
+          <button id="btn-load" class="btn secondary">Load</button>
+          <button id="btn-clear" class="btn secondary">Clear</button>
+          <div class="divider"></div>
+          <button id="btn-exit" class="btn danger-outline">Exit</button>
+        </div>
+      </header>
+
+      <!-- Dashboard Grid -->
+      <main class="dashboard-scroll">
+        <div id="host-grid" class="host-grid">
+          <!-- Dynamically populated Host Cards will go here -->
+          
+          <!-- Example Card (Hidden by default, used as template structure conceptually) -->
+          <!--
+          <div class="host-card glass-panel">
+            <div class="status-indicator online"></div>
+            <div class="host-header">
+              <h3>192.168.1.10</h3>
+              <p class="mac">00:1B:44:11:3A:B7</p>
+            </div>
+            <div class="host-body">
+              <div class="info-row"><span class="label">Hostname:</span> <span class="value">DESKTOP-ABC</span></div>
+              <div class="info-row"><span class="label">OS:</span> <span class="value">Windows 11</span></div>
+              <div class="info-row"><span class="label">Vendor:</span> <span class="value">Intel Corporate</span></div>
+            </div>
+            <div class="host-footer">
+              <button class="btn info full-width">View Details</button>
+            </div>
+          </div>
+          -->
+
+        </div>
+        
+        <!-- Empty State UI -->
+        <div id="empty-state" class="empty-state">
+          <div class="pulse-ring"></div>
+          <h2>No Hosts Detected</h2>
+          <p>Click "Scan Network" to begin discovering devices</p>
+        </div>
+      </main>
+
+    </div>
+    
+    <!-- Render Logic -->
+    <script type="module" src="./renderer.js"></script>
+  </body>
+</html>

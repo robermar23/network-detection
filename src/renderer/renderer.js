@@ -222,6 +222,20 @@ function openDetailsPanel(host) {
       </div>
     </div>
     
+    ${host.nmapData && host.nmapData.vulnerabilities && host.nmapData.vulnerabilities.length > 0 ? `
+    <div style="margin-top: 10px; border-top: 1px solid var(--border-glass); padding-top: 16px;">
+      <span class="label" style="display:block; margin-bottom: 12px; font-weight: 500; font-size: 14px; color: var(--danger);">Vulnerabilities Discovered</span>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        ${host.nmapData.vulnerabilities.map(v => `
+          <div style="background: rgba(235,94,94,0.05); border-left: 3px solid var(--danger); padding: 8px; font-size: 12px; border-radius: 4px;">
+             <div style="font-weight: 600; font-family: monospace; color: var(--danger); margin-bottom: 4px;">${v.id} (${v.severity.toUpperCase()})</div>
+             <div style="color: var(--text-muted); line-height: 1.4;">${v.details.replace(/\n/g, '<br>')}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    ` : ''}
+    
     <div class="deep-scan-container" style="margin-top: 10px;">
       <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 4px; border: 1px solid var(--border-glass); justify-content: center;">
         <span style="font-size: 12px; color: var(--text-muted); margin-right: 4px;">Engine:</span>
@@ -545,20 +559,18 @@ function getSecurityBadgeHtml(host) {
   let badgeClass = 'secondary';
   let icon = '❔';
 
-  if (host.deepAudit) {
-    if (host.deepAudit.vulnerabilities > 0) {
-      posture = 'Vulnerable';
+  if (host.deepAudit && host.deepAudit.vulnerabilities > 0) {
+      posture = `${host.deepAudit.vulnerabilities} Critical/High CVEs`;
       badgeClass = 'danger';
       icon = '🛑';
-    } else if (host.deepAudit.warnings > 0) {
-      posture = 'Warning';
+  } else if (host.deepAudit && host.deepAudit.warnings > 0) {
+      posture = `${host.deepAudit.warnings} Medium/Low CVEs`;
       badgeClass = 'warning';
       icon = '⚠️';
-    } else {
+  } else if ((host.deepAudit && host.deepAudit.history && host.deepAudit.history.length > 0) || (host.nmapData && host.nmapData.vuln)) {
       posture = 'Audited Secure';
       badgeClass = 'success';
       icon = '🛡️';
-    }
   } else if (host.ports && host.ports.length > 0) {
     const p = new Set(host.ports);
     if (p.has(21) || p.has(23) || p.has(3306) || p.has(1433) || p.has(27017)) {
@@ -1177,33 +1189,149 @@ if (window.electronAPI) {
         }
       }
 
+      // Extract Vulnerabilities
+      if (type === 'vuln') {
+        if (!hosts[hostIdx].nmapData.vulnerabilities) {
+           hosts[hostIdx].nmapData.vulnerabilities = [];
+        }
+
+        let newVulnsFound = false;
+
+        // 1. Standard Nmap `|   VULNERABILITY:` blocks
+        const vulnBlocks = fullOutput.split('|   VULNERABILITY:');
+        vulnBlocks.shift(); // remove everything before first block
+
+        vulnBlocks.forEach(block => {
+           // Parse details
+           const idMatch = block.match(/IDs:\s*([^ \r\n]+)/i);
+           const stateMatch = block.match(/State:\s*([^\r\n]+)/i);
+           const riskMatch = block.match(/Risk factor:\s*([^\r\n]+)/i);
+
+           if (idMatch && idMatch[1]) {
+             const id = idMatch[1].replace('CVE:', '').trim();
+             const state = stateMatch ? stateMatch[1].trim() : 'UNKNOWN';
+             const risk = riskMatch ? riskMatch[1].trim().toLowerCase() : 'info'; // default info
+
+             // Deduplicate
+             if (!hosts[hostIdx].nmapData.vulnerabilities.some(v => v.id === id)) {
+                hosts[hostIdx].nmapData.vulnerabilities.push({
+                   id: id,
+                   state: state,
+                   severity: risk,
+                   details: block.trim()
+                });
+                newVulnsFound = true;
+             }
+           }
+        });
+
+        // 2. Vulners script table output
+        // Example: |     	CVE-2023-38408	9.8	https://vulners.com...	*EXPLOIT*
+        const vulnersMatches = [...fullOutput.matchAll(/\|\s+([^\s]+)\s+([0-9.]+)\s+(https?:\/\/\S+)[ \t]*(\*EXPLOIT\*)?/gi)];
+        
+        vulnersMatches.forEach(match => {
+           const id = match[1].trim();
+           const cvss = parseFloat(match[2]);
+           const url = match[3].trim();
+           const isExploit = !!match[4];
+           
+           // map CVSS to severity
+           let severity = 'info';
+           if (cvss >= 9.0) severity = 'critical';
+           else if (cvss >= 7.0) severity = 'high';
+           else if (cvss >= 4.0) severity = 'medium';
+           else severity = 'low';
+
+           // Deduplicate
+           if (!hosts[hostIdx].nmapData.vulnerabilities.some(v => v.id === id)) {
+              hosts[hostIdx].nmapData.vulnerabilities.push({
+                 id: id,
+                 state: isExploit ? 'EXPLOIT AVAILABLE' : 'VULNERABLE',
+                 severity: severity,
+                 details: `CVSS Score: ${cvss}\nURL: <a href="${url}" target="_blank" style="color: var(--primary); text-decoration: underline;">${url}</a>${isExploit ? '\n<b>*EXPLOIT AVAILABLE*</b>' : ''}`
+              });
+              newVulnsFound = true;
+           }
+        });
+
+        if (newVulnsFound) {
+            // Recount and push to the primary deepAudit object so the dashboard badge inherently picks it up
+            if (!hosts[hostIdx].deepAudit) {
+               hosts[hostIdx].deepAudit = { history: [], vulnerabilities: 0, warnings: 0 };
+            }
+
+            // Recalculate totals directly based on parsed severity
+            let criCount = hosts[hostIdx].deepAudit.history.filter(h => h.vulnerable && h.severity === 'critical').length;
+            let warCount = hosts[hostIdx].deepAudit.history.filter(h => h.vulnerable && h.severity === 'warning').length;
+
+            hosts[hostIdx].nmapData.vulnerabilities.forEach(v => {
+               if (v.severity === 'high' || v.severity === 'critical') criCount++;
+               if (v.severity === 'medium' || v.severity === 'warning') warCount++;
+            });
+
+            hosts[hostIdx].deepAudit.vulnerabilities = criCount;
+            hosts[hostIdx].deepAudit.warnings = warCount;
+        }
+
+        // Always trigger metadata changed on Vuln scans to refresh UI into "Audited Secure" mode if 0 vulns found
+        metadataChanged = true;
+      }
+
       if (metadataChanged) {
         debouncedRenderAllHosts();
+
+        // Explicitly update the main dashboard Host Card (since debouncedRenderAllHosts only alters display state)
+        const card = document.getElementById(`host-${ip.replace(/\./g, '-')}`);
+        if (card) {
+           const badgeContainer = card.querySelector('.security-badge-container');
+           if (badgeContainer) badgeContainer.innerHTML = getSecurityBadgeHtml(hosts[hostIdx]);
+           
+           try {
+             const row1 = card.querySelector('.host-body .info-row:nth-child(1) .value');
+             if (row1) row1.innerText = hosts[hostIdx].hostname || 'Unknown';
+             const row2 = card.querySelector('.host-body .info-row:nth-child(2) .value');
+             if (row2) row2.innerText = hosts[hostIdx].os || 'Unknown';
+             const row3 = card.querySelector('.host-body .info-row:nth-child(3) .value');
+             if (row3) row3.innerText = hosts[hostIdx].vendor || 'Unknown';
+           } catch (e) {}
+        }
         
-        // Also cleanly update the specific opened Details panel port map if it's the active one
+        // Cleanly update the specific opened Details panel port map if it's the active one
         const btnRunDeepScan = document.getElementById('btn-run-deep-scan');
         if (btnRunDeepScan && btnRunDeepScan.getAttribute('data-ip') === ip) {
-           const elOs = document.getElementById('dp-os');
-           if (elOs) elOs.innerText = hosts[hostIdx].os || 'Unknown';
+           if (type === 'vuln') {
+              // A vulnerability scan creates complex HTML blocks. The cleanest way to show them live
+              // is to seamlessly redraw the Host Details panel.
+              openDetailsPanel(hosts[hostIdx]);
+              // Restore the Nmap tab view so it doesn't jarringly switch back to Native
+              setTimeout(() => {
+                 const nmapBtn = document.getElementById('btn-engine-nmap');
+                 if (nmapBtn) nmapBtn.click();
+              }, 10);
+           } else {
+              // For standard metadata, perform lightweight inline DOM replacements
+              const elOs = document.getElementById('dp-os');
+              if (elOs) elOs.innerText = hosts[hostIdx].os || 'Unknown';
 
-           const elHostname = document.getElementById('dp-hostname');
-           if (elHostname) elHostname.innerText = hosts[hostIdx].hostname || 'Unknown';
+              const elHostname = document.getElementById('dp-hostname');
+              if (elHostname) elHostname.innerText = hosts[hostIdx].hostname || 'Unknown';
 
-           const elVendor = document.getElementById('dp-vendor');
-           if (elVendor) elVendor.innerText = hosts[hostIdx].vendor || 'Unknown';
-           
-           const elDevice = document.getElementById('dp-device');
-           const elDeviceRow = document.getElementById('dp-device-row');
-           if (elDeviceRow && hosts[hostIdx].deviceType) {
-              elDeviceRow.style.display = 'flex';
-              if (elDevice) elDevice.innerText = hosts[hostIdx].deviceType;
-           }
+              const elVendor = document.getElementById('dp-vendor');
+              if (elVendor) elVendor.innerText = hosts[hostIdx].vendor || 'Unknown';
+              
+              const elDevice = document.getElementById('dp-device');
+              const elDeviceRow = document.getElementById('dp-device-row');
+              if (elDeviceRow && hosts[hostIdx].deviceType) {
+                 elDeviceRow.style.display = 'flex';
+                 if (elDevice) elDevice.innerText = hosts[hostIdx].deviceType;
+              }
 
-           const elKernel = document.getElementById('dp-kernel');
-           const elKernelRow = document.getElementById('dp-kernel-row');
-           if (elKernelRow && hosts[hostIdx].kernel) {
-              elKernelRow.style.display = 'flex';
-              if (elKernel) elKernel.innerText = hosts[hostIdx].kernel;
+              const elKernel = document.getElementById('dp-kernel');
+              const elKernelRow = document.getElementById('dp-kernel-row');
+              if (elKernelRow && hosts[hostIdx].kernel) {
+                 elKernelRow.style.display = 'flex';
+                 if (elKernel) elKernel.innerText = hosts[hostIdx].kernel;
+              }
            }
         }
       }

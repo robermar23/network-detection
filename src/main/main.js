@@ -8,7 +8,7 @@ import fs from 'fs';
 import { spawn, exec } from 'child_process';
 import { startNetworkScan, stopNetworkScan, getNetworkInterfaces } from './scanner.js';
 import { runDeepScan, cancelDeepScan } from './deepScanner.js';
-import { checkNmapInstalled, runNmapScan, cancelNmapScan } from './nmapScanner.js';
+import { checkNmapInstalled, runNmapScan, cancelNmapScan, runNcat } from './nmapScanner.js';
 import { createMainWindow } from './windowManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -134,6 +134,22 @@ ipcMain.handle(IPC_CHANNELS.CANCEL_NMAP_SCAN, async (event, target) => {
   console.log(`Nmap scan cancel requested for ${target}`);
   const success = cancelNmapScan(target);
   return { status: success ? 'cancelled' : 'not_found' };
+});
+
+ipcMain.handle(IPC_CHANNELS.RUN_NCAT, async (event, payloadObj) => {
+  console.log(`Ncat requested on ${payloadObj.target}:${payloadObj.port}`);
+  runNcat(payloadObj, 
+    (chunkData) => {
+      if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.NMAP_SCAN_RESULT, { target: payloadObj.target, type: 'ncat', ...chunkData });
+    },
+    (completeData) => {
+      if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.NMAP_SCAN_COMPLETE, { type: 'ncat', target: payloadObj.target, ...completeData });
+    },
+    (errorData) => {
+      if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.NMAP_SCAN_ERROR, { target: payloadObj.target, type: 'ncat', ...errorData });
+    }
+  );
+  return { status: 'started' };
 });
 
 ipcMain.handle(IPC_CHANNELS.STOP_SCAN, async (event) => {

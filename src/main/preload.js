@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Nmap Triggers
   checkNmap: () => ipcRenderer.invoke(IPC_CHANNELS.CHECK_NMAP),
   runNmapScan: (type, target) => ipcRenderer.invoke(IPC_CHANNELS.RUN_NMAP_SCAN, { type, target }),
+  runNcat: (payloadObj) => ipcRenderer.invoke(IPC_CHANNELS.RUN_NCAT, payloadObj),
   cancelNmapScan: (target) => ipcRenderer.invoke(IPC_CHANNELS.CANCEL_NMAP_SCAN, target),
 
   // Event Listeners for streams

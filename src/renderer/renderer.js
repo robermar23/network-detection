@@ -200,6 +200,16 @@ function openDetailsPanel(host) {
       <span class="label">Operating System</span>
       <div class="value">${host.os || 'Unknown'}</div>
     </div>
+    ${host.deviceType ? `
+    <div class="info-row">
+      <span class="label">Device Type</span>
+      <div class="value">${host.deviceType}</div>
+    </div>` : ''}
+    ${host.kernel ? `
+    <div class="info-row">
+      <span class="label" style="min-width: 60px;">Kernel</span>
+      <div class="value" style="text-align: right;">${host.kernel}</div>
+    </div>` : ''}
     <div class="info-row">
       <span class="label">Hardware Vendor</span>
       <div class="value">${host.vendor || 'Unknown'}</div>
@@ -219,6 +229,7 @@ function openDetailsPanel(host) {
         <span style="font-size: 12px; color: var(--text-muted); margin-right: 4px;">Engine:</span>
         <button id="btn-engine-native" class="btn icon-only active" title="Native Scanner" style="padding: 4px 12px; border-radius: 4px; font-size: 12px; height: 24px; box-shadow: none;">Native</button>
         <button id="btn-engine-nmap" class="btn icon-only" title="Nmap Scanner" style="padding: 4px 12px; border-radius: 4px; font-size: 12px; height: 24px; box-shadow: none;">Nmap</button>
+        <button id="btn-engine-ncat" class="btn icon-only" title="Ncat Netcat" style="padding: 4px 12px; border-radius: 4px; font-size: 12px; height: 24px; box-shadow: none;">Ncat</button>
       </div>
 
       <!-- Native Actions -->
@@ -241,12 +252,23 @@ function openDetailsPanel(host) {
         </button>
       </div>
 
+      <!-- Ncat Actions -->
+      <div id="ncat-actions" style="display: none; flex-direction: column; gap: 8px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 6px; border: 1px solid var(--border-glass);">
+        <div style="display: flex; gap: 8px;">
+          <input type="number" id="input-ncat-port" class="text-input" placeholder="Port" style="width: 80px;" min="1" max="65535">
+          <input type="text" id="input-ncat-payload" class="text-input" placeholder="Payload (e.g. GET / HTTP/1.0)" style="flex-grow: 1;">
+        </div>
+        <button id="btn-run-ncat" class="btn primary full-width" data-ip="${host.ip}" title="Launch Ncat connection">
+          <span class="icon">🔌</span> Connect & Send
+        </button>
+      </div>
+
       <!-- Results Containers -->
-      <div id="deep-scan-results" class="deep-scan-results">
+      <div id="deep-scan-results" class="deep-scan-results selectable-text">
         ${savedDeepScanHtml}
       </div>
 
-      <div id="nmap-scan-results" style="display: none; margin-top: 12px; flex-direction: column; gap: 8px;">
+      <div id="nmap-scan-results" class="selectable-text" style="display: none; margin-top: 12px; flex-direction: column; gap: 8px;">
         ${getSavedNmapHtml(host)}
       </div>
     </div>
@@ -319,35 +341,102 @@ function getSavedNmapHtml(host) {
 
 function attachDetailsPanelListeners(host) {
   const btnRunDeepScan = document.getElementById('btn-run-deep-scan');
-  const dsResults = document.getElementById('deep-scan-results');
   const btnEngineNative = document.getElementById('btn-engine-native');
   const btnEngineNmap = document.getElementById('btn-engine-nmap');
+  const btnEngineNcat = document.getElementById('btn-engine-ncat');
+  
   const nativeActions = document.getElementById('native-actions');
   const nmapActions = document.getElementById('nmap-actions');
+  const ncatActions = document.getElementById('ncat-actions');
+  
+  const dsResults = document.getElementById('deep-scan-results');
   const nmapScanResults = document.getElementById('nmap-scan-results');
 
   // Engine toggles
   btnEngineNative.addEventListener('click', () => {
     btnEngineNative.classList.add('active');
     btnEngineNmap.classList.remove('active');
+    btnEngineNcat.classList.remove('active');
     nativeActions.style.display = 'block';
     nmapActions.style.display = 'none';
+    ncatActions.style.display = 'none';
     dsResults.style.display = 'flex';
     nmapScanResults.style.display = 'none';
   });
 
   btnEngineNmap.addEventListener('click', () => {
     if (!isNmapInstalled) {
-       alert('Nmap is not installed. Please follow the download instructions at the top.');
+       document.getElementById('nmap-install-banner').style.display = 'block';
        return;
     }
     btnEngineNmap.classList.add('active');
     btnEngineNative.classList.remove('active');
+    btnEngineNcat.classList.remove('active');
     nmapActions.style.display = 'flex';
     nativeActions.style.display = 'none';
+    ncatActions.style.display = 'none';
     nmapScanResults.style.display = 'flex';
     dsResults.style.display = 'none';
   });
+
+  btnEngineNcat.addEventListener('click', () => {
+    if (!isNmapInstalled) {
+       document.getElementById('nmap-install-banner').style.display = 'block';
+       return;
+    }
+    btnEngineNcat.classList.add('active');
+    btnEngineNative.classList.remove('active');
+    btnEngineNmap.classList.remove('active');
+    ncatActions.style.display = 'flex';
+    nativeActions.style.display = 'none';
+    nmapActions.style.display = 'none';
+    nmapScanResults.style.display = 'flex'; // Share nmap results space
+    dsResults.style.display = 'none';
+  });
+
+  // Ncat Logic
+  const btnRunNcat = document.getElementById('btn-run-ncat');
+  if (btnRunNcat) {
+    btnRunNcat.addEventListener('click', async () => {
+      const portVal = document.getElementById('input-ncat-port').value;
+      if (!portVal) {
+        alert("Please specify a Target Port for Ncat.");
+        return;
+      }
+      
+      const isScanning = btnRunNcat.getAttribute('data-scanning') === 'true';
+      if (isScanning) {
+        // Handle cancel
+        if (btnRunNcat.getAttribute('data-scanning') === 'cancelling') return;
+        btnRunNcat.setAttribute('data-scanning', 'cancelling');
+        btnRunNcat.innerHTML = `<span class="icon">🛑</span> Stopping...`;
+        window.electronAPI.cancelNmapScan(host.ip); // Shared cancel registry in backend
+        return;
+      }
+
+      btnRunNcat.setAttribute('data-scanning', 'true');
+      btnRunNcat.classList.add('pulsing');
+      btnRunNcat.innerHTML = `<span class="icon">🔄</span> Running...`;
+
+      // Build live UI block
+      let block = document.getElementById(`nmap-live-banner-ncat`);
+      if (!block) {
+        block = document.createElement('pre');
+        block.id = `nmap-live-banner-ncat`;
+        block.className = 'ds-banner selectable-text';
+        nmapScanResults.prepend(block);
+      }
+      block.innerText = 'Connecting via Ncat...';
+      
+      const payloadObj = {
+         target: host.ip,
+         port: portVal,
+         payload: document.getElementById('input-ncat-payload').value
+      };
+
+      await window.electronAPI.runNcat(payloadObj);
+    });
+  }
 
   // Native Deep Scan Logic
   btnRunDeepScan.addEventListener('click', async () => {
@@ -1030,11 +1119,44 @@ if (window.electronAPI) {
 
       // Extract OS
       if (type === 'host' || type === 'deep') {
+        // OS Extraction
         const osMatch1 = fullOutput.match(/OS details:\s*(.*?)(?:\n|$)/);
         const osMatch2 = fullOutput.match(/Service Info:.*?OS:\s*([^;]+);/);
         const osName = (osMatch1 && osMatch1[1]) || (osMatch2 && osMatch2[1]);
-        if (osName && (!hosts[hostIdx].os || hosts[hostIdx].os === 'Unknown' || hosts[hostIdx].os === 'Unknown OS')) {
+        if (osName) {
            hosts[hostIdx].os = `(Nmap) ${osName.substring(0, 30)}`;
+           metadataChanged = true;
+        }
+
+        // Hostname Extraction
+        const hostMatch = fullOutput.match(/Nmap scan report for (([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|[a-zA-Z0-9-]+)\s+\(/);
+        if (hostMatch && hostMatch[1]) {
+           const foundName = hostMatch[1];
+           // Always overwrite if Nmap gives us a real name (not just echoing the IP)
+           if (foundName !== ip) {
+             hosts[hostIdx].hostname = foundName;
+             metadataChanged = true;
+           }
+        }
+
+        // Hardware Vendor Extraction (from MAC Address line)
+        const macMatch = fullOutput.match(/MAC Address:\s*[0-9A-Fa-f:]+\s*\((.*?)\)/);
+        if (macMatch && macMatch[1] && macMatch[1] !== 'Unknown') {
+           hosts[hostIdx].vendor = macMatch[1];
+           metadataChanged = true;
+        }
+
+        // Device Type Extraction
+        const deviceMatch = fullOutput.match(/Device type:\s*(.*?)\n/);
+        if (deviceMatch && deviceMatch[1]) {
+           hosts[hostIdx].deviceType = deviceMatch[1];
+           metadataChanged = true;
+        }
+
+        // Kernel Extraction
+        const kernelMatch = fullOutput.match(/Running(?:\s*\(JUST GUESSING\))?:\s*(.*?)\n/);
+        if (kernelMatch && kernelMatch[1]) {
+           hosts[hostIdx].kernel = kernelMatch[1];
            metadataChanged = true;
         }
 
@@ -1075,7 +1197,8 @@ if (window.electronAPI) {
       'deep': 'btn-nmap-deep',
       'host': 'btn-nmap-host',
       'vuln': 'btn-nmap-vuln',
-      'port': `btn-nmap-port-${port}`
+      'port': `btn-nmap-port-${port}`,
+      'ncat': 'btn-run-ncat'
     };
     
     const btn = document.getElementById(btnIds[type]);
@@ -1083,11 +1206,16 @@ if (window.electronAPI) {
       const wasCancelled = btn.getAttribute('data-scanning') === 'cancelling';
       btn.classList.remove('pulsing', 'danger-pulsing');
       btn.removeAttribute('data-scanning');
-      btn.innerHTML = wasCancelled ? `<span class="icon">⚠️</span> Scan Cancelled` : `<span class="icon">✅</span> Scan Complete`;
+      
+      if (type === 'ncat') {
+         btn.innerHTML = wasCancelled ? `<span class="icon">⚠️</span> Disconnected` : `<span class="icon">🔌</span> Connect & Send`;
+      } else {
+         btn.innerHTML = wasCancelled ? `<span class="icon">⚠️</span> Scan Cancelled` : `<span class="icon">✅</span> Scan Complete`;
+      }
 
       if (wasCancelled) {
         const bannerBlock = document.getElementById(`nmap-live-banner-${type}`);
-        if (bannerBlock) bannerBlock.innerHTML += '\n\n[SCAN CANCELLED]';
+        if (bannerBlock) bannerBlock.innerHTML += '\n\n[DISCONNECTED]';
       }
     }
   });
@@ -1101,12 +1229,12 @@ if (window.electronAPI) {
     
     const target = data.target;
     const port = type === 'port' ? target.split(':')[1] : null;
-    const btnIds = { 'deep': 'btn-nmap-deep', 'host': 'btn-nmap-host', 'vuln': 'btn-nmap-vuln', 'port': `btn-nmap-port-${port}` };
+    const btnIds = { 'deep': 'btn-nmap-deep', 'host': 'btn-nmap-host', 'vuln': 'btn-nmap-vuln', 'port': `btn-nmap-port-${port}`, 'ncat': 'btn-run-ncat' };
     const btn = document.getElementById(btnIds[type]);
     if (btn) {
       btn.classList.remove('pulsing', 'danger-pulsing');
       btn.removeAttribute('data-scanning');
-      btn.innerHTML = `<span class="icon">❌</span> Scan Failed`;
+      btn.innerHTML = type === 'ncat' ? `<span class="icon">❌</span> Connection Failed` : `<span class="icon">❌</span> Scan Failed`;
     }
   });
 }

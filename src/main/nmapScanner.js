@@ -80,3 +80,67 @@ export async function runNmapScan(type, target, onResultCallback, onCompleteCall
     onErrorCallback({ error: err.message });
   });
 }
+
+// ==========================================
+// NCAT Execution
+// ==========================================
+
+export async function runNcat({ target, port, payload }, onResultCallback, onCompleteCallback, onErrorCallback) {
+  const isInstalled = await checkNmapInstalled();
+  if (!isInstalled) {
+    onErrorCallback({ error: 'Nmap (and Ncat) is not installed or not in PATH.' });
+    return;
+  }
+
+  // Ncat arguments: ncat [options] <host> <port>
+  // We use -w 5 for a 5 second timeout so it doesn't hang forever if unresponsive.
+  let args = ['-v', '-w', '10', target, port];
+  
+  console.log(`Starting Ncat on ${target}:${port} with args:`, args.join(' '));
+
+  const ncatProcess = spawn('ncat', args);
+  // Share the same activeScans registry so cancellation works seamlessly
+  activeScans.set(target, ncatProcess);
+
+  const fullOutput = [];
+
+  ncatProcess.stdout.on('data', (data) => {
+    const str = data.toString();
+    fullOutput.push(str);
+    onResultCallback({ chunk: str });
+  });
+
+  ncatProcess.stderr.on('data', (data) => {
+    const str = data.toString();
+    fullOutput.push(str);
+    onResultCallback({ chunk: str });
+  });
+
+  // If the user provided a payload, write it to stdin and send EOF
+  if (payload && payload.trim() !== '') {
+     try {
+       // Replace literal \n and \r tags the user might type inside the UI box with actual breaks
+       let formattedPayload = payload.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
+       if (!formattedPayload.endsWith('\n')) {
+         formattedPayload += '\n';
+       }
+       ncatProcess.stdin.write(formattedPayload);
+       // We DO NOT end stdin here anymore so the server stream stays alive continuously.
+       // User can click "Stop" in UI to kill the ncat process.
+     } catch (e) {
+       console.error("Failed to write Ncat payload:", e);
+     }
+  }
+
+  ncatProcess.on('close', (code) => {
+    activeScans.delete(target);
+    console.log(`Ncat completed with code ${code}`);
+    onCompleteCallback({ success: code === 0, fullOutput: fullOutput.join('') });
+  });
+
+  ncatProcess.on('error', (err) => {
+    activeScans.delete(target);
+    console.error('Ncat spawn error:', err);
+    onErrorCallback({ error: err.message });
+  });
+}

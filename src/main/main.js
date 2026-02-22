@@ -113,7 +113,7 @@ ipcMain.handle(IPC_CHANNELS.STOP_SCAN, async (event) => {
   return { status: 'stopped' };
 });
 
-ipcMain.handle(IPC_CHANNELS.OPEN_EXTERNAL_ACTION, async (event, { type, ip, port }) => {
+ipcMain.handle(IPC_CHANNELS.OPEN_EXTERNAL_ACTION, async (event, { type, ip, port, username }) => {
   console.log(`External action requested: ${type} to ${ip}:${port}`);
   
   // Detailed Security Payload Validation
@@ -135,12 +135,13 @@ ipcMain.handle(IPC_CHANNELS.OPEN_EXTERNAL_ACTION, async (event, { type, ip, port
     if (type === 'http' || type === 'https') {
       await shell.openExternal(`${type}://${ip}${port ? ':' + port : ''}`);
     } else if (type === 'ssh') {
+      const user = (username || 'root').replace(/[^a-zA-Z0-9_\-]/g, ''); // Basic sanitization
       if (process.platform === 'win32') {
-        spawn('cmd.exe', ['/c', 'start', 'cmd.exe', '/k', `ssh root@${ip}`]);
+        spawn('cmd.exe', ['/c', 'start', 'cmd.exe', '/k', `ssh ${user}@${ip}`]);
       } else if (process.platform === 'darwin') {
-        exec(`osascript -e 'tell app "Terminal" to do script "ssh root@${ip}"'`);
+        exec(`osascript -e 'tell app "Terminal" to do script "ssh ${user}@${ip}"'`);
       } else {
-        exec(`gnome-terminal -- ssh root@${ip}`);
+        exec(`gnome-terminal -- ssh ${user}@${ip}`);
       }
     } else if (type === 'rdp') {
       if (process.platform === 'win32') {

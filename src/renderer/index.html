@@ -21,40 +21,70 @@
   <div class="app-container">
 
     <!-- Header / Controls -->
-    <header class="glass-panel main-header">
-      <div class="header-titles">
-        <h1>NetSpecter</h1>
-        <p class="subtitle" id="status-text">Ready to scan.</p>
+    <header class="glass-panel main-header" style="flex-direction: column; gap: 16px; align-items: stretch;">
+      <div class="header-top" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <div class="header-titles">
+          <h1>NetSpecter</h1>
+          <p class="subtitle" id="status-text">Ready to scan.</p>
+        </div>
+
+        <div class="control-group">
+          <select id="interface-select" class="dropdown-select" disabled>
+            <option value="">Loading interfaces...</option>
+          </select>
+          <button id="btn-refresh-interfaces" class="btn secondary icon-only" title="Refresh Interfaces">🔄</button>
+          <div class="divider"></div>
+          <button id="btn-scan" class="btn primary" disabled>
+            <span class="icon">🔍</span> Scan Network
+          </button>
+          <button id="btn-stop" class="btn danger" disabled>
+            <span class="icon">🛑</span> Stop
+          </button>
+          <div class="divider"></div>
+          <button id="btn-save" class="btn secondary">Save</button>
+          <button id="btn-load" class="btn secondary">Load</button>
+          <button id="btn-clear" class="btn secondary">Clear</button>
+          <div class="divider"></div>
+          <button id="btn-exit" class="btn danger-outline">Exit</button>
+        </div>
       </div>
 
-      <div class="control-group">
-        <select id="interface-select" class="dropdown-select" disabled>
-          <option value="">Loading interfaces...</option>
-        </select>
-        <button id="btn-refresh-interfaces" class="btn secondary icon-only" title="Refresh Interfaces">🔄</button>
-        <div class="divider"></div>
-        <div class="view-toggles"
-          style="display: flex; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 2px; border: 1px solid var(--border-glass);">
-          <button id="btn-view-grid" class="btn icon-only active" title="Grid View"
-            style="padding: 4px 8px; border-radius: 4px; box-shadow: none;">⏹️</button>
-          <button id="btn-view-list" class="btn icon-only" title="List View"
-            style="padding: 4px 8px; border-radius: 4px; box-shadow: none;">☰</button>
-          <button id="btn-view-table" class="btn icon-only" title="Table View"
-            style="padding: 4px 8px; border-radius: 4px; box-shadow: none;">🗄️</button>
+      <div class="header-bottom"
+        style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <div class="filter-group" style="display: flex; gap: 8px; align-items: center;">
+          <input type="text" id="filter-ip" class="text-input" placeholder="IP...">
+          <input type="text" id="filter-os" class="text-input" placeholder="OS...">
+          <input type="text" id="filter-vendor" class="text-input" placeholder="Vendor...">
+
+          <div class="divider"></div>
+
+          <select id="sort-select" class="dropdown-select">
+            <option value="ip">Sort IP</option>
+            <option value="os">Sort OS</option>
+            <option value="vendor">Sort Vendor</option>
+          </select>
+          <button id="btn-sort-dir" class="btn secondary icon-only" title="Toggle Sort Direction"
+            data-dir="asc">⬇️</button>
+
+          <div class="divider"></div>
+          <span class="subtitle" id="result-count-text">Showing 0 of 0 hosts</span>
         </div>
-        <div class="divider"></div>
-        <button id="btn-scan" class="btn primary" disabled>
-          <span class="icon">🔍</span> Scan Network
-        </button>
-        <button id="btn-stop" class="btn danger" disabled>
-          <span class="icon">🛑</span> Stop
-        </button>
-        <div class="divider"></div>
-        <button id="btn-save" class="btn secondary">Save</button>
-        <button id="btn-load" class="btn secondary">Load</button>
-        <button id="btn-clear" class="btn secondary">Clear</button>
-        <div class="divider"></div>
-        <button id="btn-exit" class="btn danger-outline">Exit</button>
+
+        <div class="action-group" style="display: flex; gap: 12px; align-items: center;">
+          <button id="btn-deep-scan-all" class="btn info" style="display: none;">
+            <span class="icon">⚡</span> Deep Scan All
+          </button>
+          <div class="divider"></div>
+          <div class="view-toggles"
+            style="display: flex; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 2px; border: 1px solid var(--border-glass);">
+            <button id="btn-view-grid" class="btn icon-only active" title="Grid View"
+              style="padding: 4px 8px; border-radius: 4px; box-shadow: none;">⏹️</button>
+            <button id="btn-view-list" class="btn icon-only" title="List View"
+              style="padding: 4px 8px; border-radius: 4px; box-shadow: none;">☰</button>
+            <button id="btn-view-table" class="btn icon-only" title="Table View"
+              style="padding: 4px 8px; border-radius: 4px; box-shadow: none;">🗄️</button>
+          </div>
+        </div>
       </div>
     </header>
 

@@ -22,7 +22,16 @@ const btnViewGrid = document.getElementById('btn-view-grid');
 const btnViewList = document.getElementById('btn-view-list');
 const btnViewTable = document.getElementById('btn-view-table');
 
+const filterIp = document.getElementById('filter-ip');
+const filterOs = document.getElementById('filter-os');
+const filterVendor = document.getElementById('filter-vendor');
+const sortSelect = document.getElementById('sort-select');
+const btnSortDir = document.getElementById('btn-sort-dir');
+const resultCountText = document.getElementById('result-count-text');
+const btnDeepScanAll = document.getElementById('btn-deep-scan-all');
+
 let currentView = 'grid'; // 'grid', 'list', 'table'
+let sortDirection = 'asc'; // 'asc', 'desc'
 
 // State
 let isScanning = false;
@@ -107,6 +116,25 @@ btnRefreshInterfaces.addEventListener('click', () => {
   initInterfaces();
 });
 
+function getActionButtonsHtml(ip, data) {
+  let actionsHtml = '';
+  if (data.port === 80 || data.port === 8080) {
+    actionsHtml = `<button class="btn-action" onclick="window.electronAPI.openExternalAction({type:'http', ip:'${ip}', port:${data.port}})"><span class="icon">🌐</span> Open HTTP</button>`;
+  } else if (data.port === 443 || data.port === 8443) {
+    actionsHtml = `<button class="btn-action" onclick="window.electronAPI.openExternalAction({type:'https', ip:'${ip}', port:${data.port}})"><span class="icon">🔒</span> Open HTTPS</button>`;
+  } else if (data.port === 22) {
+    const inputId = `ssh-user-${ip.replace(/\./g, '-')}-${data.port}`;
+    actionsHtml = `
+      <div style="display:flex; gap: 4px; align-items: center;">
+        <input type="text" id="${inputId}" class="text-input" style="width: 70px; padding: 4px 6px; font-size: 11px;" placeholder="root" value="root" title="SSH Username">
+        <button class="btn-action" onclick="window.electronAPI.openExternalAction({type:'ssh', ip:'${ip}', username: document.getElementById('${inputId}').value || 'root'})"><span class="icon">⌨️</span> Connect SSH</button>
+      </div>`;
+  } else if (data.port === 3389) {
+    actionsHtml = `<button class="btn-action" onclick="window.electronAPI.openExternalAction({type:'rdp', ip:'${ip}'})"><span class="icon">🖥️</span> Remote Desktop</button>`;
+  }
+  return actionsHtml ? `<div class="ds-actions">${actionsHtml}</div>` : '';
+}
+
 // --- Details Panel ---
 function openDetailsPanel(host) {
   // Build previously saved Deep Scan results (if any)
@@ -133,6 +161,7 @@ function openDetailsPanel(host) {
                 <span class="ds-service">${data.serviceName}</span>
                 ${actionTag}
               </div>
+              ${getActionButtonsHtml(host.ip, data)}
             </div>
             <div class="ds-details" style="${data.vulnerable ? 'color: var(--danger); font-weight: 500;' : ''}">${data.details}</div>
             ${bannerHtml}
@@ -242,11 +271,10 @@ function setScanningState(scanning) {
 // --- Dynamic Rendering ---
 
 function getSecurityBadgeHtml(host) {
-  let posture = 'Protected';
-  let badgeClass = 'success';
-  let icon = '🛡️';
+  let posture = 'Unknown';
+  let badgeClass = 'secondary';
+  let icon = '❔';
 
-  // Has it been deeply audited yet?
   if (host.deepAudit) {
     if (host.deepAudit.vulnerabilities > 0) {
       posture = 'Vulnerable';
@@ -256,31 +284,234 @@ function getSecurityBadgeHtml(host) {
       posture = 'Warning';
       badgeClass = 'warning';
       icon = '⚠️';
+    } else {
+      posture = 'Audited Secure';
+      badgeClass = 'success';
+      icon = '🛡️';
     }
   } else if (host.ports && host.ports.length > 0) {
-    // Basic heuristics based just on surface port sweep
     const p = new Set(host.ports);
     if (p.has(21) || p.has(23) || p.has(3306) || p.has(1433) || p.has(27017)) {
-       posture = 'Vulnerable';
+       posture = 'Risky Ports';
        badgeClass = 'danger';
        icon = '🛑';
     } else if (p.has(80) || p.has(445) || p.has(135)) {
-       posture = 'Warning';
+       posture = 'Exposed Services';
        badgeClass = 'warning';
        icon = '⚠️';
+    } else {
+       posture = 'Unscanned';
+       badgeClass = 'secondary';
+       icon = '❔';
     }
+  } else {
+    posture = 'Unscanned';
+    badgeClass = 'secondary';
+    icon = '❔';
   }
 
   return `<span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--${badgeClass}); color: var(--${badgeClass}); background: rgba(0,0,0,0.2);">${icon} ${posture}</span>`;
 }
 
-function renderHostCard(host) {
-  // Hide empty state if this is the first item
-  if (hosts.length === 1) {
+function getFilteredAndSortedHosts() {
+  const ipTerm = filterIp.value.toLowerCase();
+  const osTerm = filterOs.value.toLowerCase();
+  const vendorTerm = filterVendor.value.toLowerCase();
+  
+  let filteredHosts = hosts.filter((h) => {
+    const matchIp = h.ip ? h.ip.toLowerCase().includes(ipTerm) : false;
+    const matchOs = h.os ? String(h.os).toLowerCase().includes(osTerm) : false;
+    const matchVendor = h.vendor ? String(h.vendor).toLowerCase().includes(vendorTerm) : false;
+    return (ipTerm === '' || matchIp) && (osTerm === '' || matchOs) && (vendorTerm === '' || matchVendor);
+  });
+
+  const sortBy = sortSelect.value;
+  filteredHosts.sort((a, b) => {
+    let valA = a[sortBy] || '';
+    let valB = b[sortBy] || '';
+    
+    if (sortBy === 'ip') {
+       try {
+         const numA = Number(valA.split('.').map(n => (`000${n}`).slice(-3)).join(''));
+         const numB = Number(valB.split('.').map(n => (`000${n}`).slice(-3)).join(''));
+         valA = numA; valB = numB;
+       } catch (e) {}
+    } else {
+       valA = String(valA).toLowerCase();
+       valB = String(valB).toLowerCase();
+    }
+    
+    if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+    if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+  
+  return filteredHosts;
+}
+
+function renderAllHosts() {
+  const filteredHosts = getFilteredAndSortedHosts();
+
+  resultCountText.innerText = `Showing ${filteredHosts.length} of ${hosts.length} hosts`;
+  
+  if (filteredHosts.length > 0) {
+    btnDeepScanAll.style.display = 'inline-flex';
     emptyState.classList.add('hidden');
+  } else {
+    btnDeepScanAll.style.display = 'none';
+    if (hosts.length === 0) {
+      emptyState.classList.remove('hidden');
+    } else {
+      emptyState.classList.add('hidden');
+    }
   }
 
-  // Create DOM Elements
+  if (typeof applyViewStyle === 'function') {
+     applyViewStyle();
+  }
+
+  const allCards = Array.from(hostGrid.querySelectorAll('.host-card'));
+  allCards.forEach(c => c.style.display = 'none');
+  
+  filteredHosts.forEach(host => {
+     let card = document.getElementById(`host-${host.ip.replace(/\./g, '-')}`);
+     if (!card) {
+       card = createHostCardDOM(host);
+     } else {
+       card.style.display = '';
+     }
+     hostGrid.appendChild(card);
+  });
+}
+
+filterIp.addEventListener('input', renderAllHosts);
+filterOs.addEventListener('input', renderAllHosts);
+filterVendor.addEventListener('input', renderAllHosts);
+sortSelect.addEventListener('change', renderAllHosts);
+
+btnSortDir.addEventListener('click', () => {
+  sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+  btnSortDir.innerText = sortDirection === 'asc' ? '⬇️' : '⬆️';
+  btnSortDir.dataset.dir = sortDirection;
+  renderAllHosts();
+});
+
+let renderTimeout;
+function debouncedRenderAllHosts() {
+  clearTimeout(renderTimeout);
+  renderTimeout = setTimeout(() => {
+    renderAllHosts();
+  }, 100);
+}
+
+// --- Deep Scan All Logic ---
+let isDeepScanningAll = false;
+let deepScanAllQueue = [];
+let deepScanAllActive = new Set();
+let deepScanAllTotal = 0;
+let deepScanAllCompleted = 0;
+let deepScanHostProgress = {}; // Store percentage per IP
+const MAX_CONCURRENT_DEEP_SCANS = 3;
+
+function updateDeepScanAllProgress() {
+  if (!isDeepScanningAll) return;
+  
+  let activePercentageSum = 0;
+  let activeCount = 0;
+  
+  for (const ip of deepScanAllActive) {
+    if (deepScanHostProgress[ip] !== undefined) {
+      activePercentageSum += deepScanHostProgress[ip];
+      activeCount++;
+    }
+  }
+  
+  // Calculate total progress correctly instead of just active batch average
+  // Total progress = (completed * 100 + activeSum) / (total * 100)
+  let totalPercentageVal = 0;
+  if (deepScanAllTotal > 0) {
+    const totalMaxProgress = deepScanAllTotal * 100;
+    const currentProgressTotal = (deepScanAllCompleted * 100) + activePercentageSum;
+    totalPercentageVal = Math.round((currentProgressTotal / totalMaxProgress) * 100);
+  }
+  
+  if (isDeepScanningAll) {
+    statusText.innerText = `Deep scanning: ${deepScanAllCompleted}/${deepScanAllTotal} hosts completed - ${totalPercentageVal}%`;
+  }
+}
+
+function pumpDeepScanQueue() {
+  if (!isDeepScanningAll) return;
+  
+  while (deepScanAllActive.size < MAX_CONCURRENT_DEEP_SCANS && deepScanAllQueue.length > 0) {
+    const ip = deepScanAllQueue.shift();
+    deepScanAllActive.add(ip);
+    
+    // Reset Data State
+    const hostIdx = hosts.findIndex(h => h.ip === ip);
+    if (hostIdx >= 0) {
+      hosts[hostIdx].deepAudit = { history: [], vulnerabilities: 0, warnings: 0 };
+    }
+    
+    // Visual update for Details Panel
+    const btnRunDeepScan = document.getElementById('btn-run-deep-scan');
+    if (btnRunDeepScan && btnRunDeepScan.getAttribute('data-ip') === ip) {
+       btnRunDeepScan.setAttribute('data-scanning', 'true');
+       btnRunDeepScan.classList.add('pulsing', 'danger-pulsing');
+       btnRunDeepScan.classList.remove('warning');
+       btnRunDeepScan.innerHTML = `<span class="icon">🛑</span> Cancel Scan...`;
+       const dsResults = document.getElementById('deep-scan-results');
+       if (dsResults) dsResults.innerHTML = '';
+    }
+
+    window.electronAPI.runDeepScan(ip);
+  }
+  
+  if (deepScanAllQueue.length === 0 && deepScanAllActive.size === 0) {
+    isDeepScanningAll = false;
+    btnDeepScanAll.innerHTML = `<span class="icon">⚡</span> Deep Scan All`;
+    btnDeepScanAll.classList.remove('danger');
+    btnDeepScanAll.classList.add('info');
+    statusText.innerText = `Deep scan all finished (${deepScanAllTotal} hosts).`;
+  } else {
+    updateDeepScanAllProgress();
+  }
+}
+
+btnDeepScanAll.addEventListener('click', () => {
+  if (isDeepScanningAll) {
+    isDeepScanningAll = false;
+    for (const ip of deepScanAllActive) {
+      window.electronAPI.cancelDeepScan(ip);
+    }
+    deepScanAllActive.clear();
+    deepScanAllQueue = [];
+    
+    btnDeepScanAll.innerHTML = `<span class="icon">⚡</span> Deep Scan All`;
+    btnDeepScanAll.classList.remove('danger');
+    btnDeepScanAll.classList.add('info');
+    statusText.innerText = 'Deep scan all cancelled.';
+    return;
+  }
+
+  const filteredHosts = getFilteredAndSortedHosts();
+  if (filteredHosts.length === 0) return;
+
+  isDeepScanningAll = true;
+  deepScanAllQueue = filteredHosts.map(h => h.ip);
+  deepScanAllTotal = deepScanAllQueue.length;
+  deepScanAllCompleted = 0;
+  deepScanAllActive.clear();
+  deepScanHostProgress = {};
+  
+  btnDeepScanAll.innerHTML = `<span class="icon">🛑</span> Cancel Deep Scan All`;
+  btnDeepScanAll.classList.remove('info');
+  btnDeepScanAll.classList.add('danger');
+  
+  pumpDeepScanQueue();
+});
+
+function createHostCardDOM(host) {
   const card = document.createElement('div');
   card.className = 'host-card glass-panel';
   card.id = `host-${host.ip.replace(/\./g, '-')}`;
@@ -297,6 +528,7 @@ function renderHostCard(host) {
       <div class="info-row"><span class="label">Vendor:</span> <span class="value" title="${host.vendor}">${host.vendor || 'Unknown'}</span></div>
       <div class="security-badge-container">
          ${getSecurityBadgeHtml(host)}
+         ${(isDeepScanningAll && deepScanAllActive.has(host.ip) && deepScanHostProgress[host.ip]) ? `<span class="ds-progress-badge" style="font-size: 11px; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--info); color: var(--text-main); background: rgba(94, 114, 235, 0.2); margin-left: 6px;">⏳ ${deepScanHostProgress[host.ip]}%</span>` : ''}
       </div>
     </div>
     <div class="host-footer" style="padding-top: 8px;">
@@ -304,19 +536,12 @@ function renderHostCard(host) {
     </div>
   `;
 
-  // Inject into grid
-  hostGrid.appendChild(card);
-
-  // Attach Event Listener for Details
   const btnView = card.querySelector('.btn-view');
   if (btnView) {
     btnView.addEventListener('click', () => openDetailsPanel(host));
   }
   
-  // Re-apply the view logic if table headers need initializing
-  if (typeof applyViewStyle === 'function') {
-     applyViewStyle();
-  }
+  return card;
 }
 
 function clearGrid() {
@@ -367,12 +592,7 @@ btnLoad.addEventListener('click', async () => {
     clearGrid();
     hosts = response.data;
     
-    // Force empty state removal, as bulk loading bypasses 1x1 render checks
-    if (hosts.length > 0) {
-       emptyState.classList.add('hidden');
-    }
-    
-    hosts.forEach(renderHostCard);
+    renderAllHosts();
     statusText.innerText = `Loaded ${hosts.length} hosts from ${response.path}`;
   }
 });
@@ -389,24 +609,20 @@ btnExit.addEventListener('click', () => {
 // 2. Incoming Event Streams
 if (window.electronAPI) {
   window.electronAPI.onHostFound((hostData) => {
-    // Check if duplicate IP, update if exists, otherwise push
     const existingIdx = hosts.findIndex(h => h.ip === hostData.ip);
     
-    // Only completely re-render if it's a NEW host, or if fields significantly changed,
-    // otherwise the aggressive DOM wiping destroys the Deep Scan panel while it's open.
     if (existingIdx >= 0) {
       hosts[existingIdx] = { ...hosts[existingIdx], ...hostData };
-      
-      // Selectively update DOM elements instead of wiping the grid
       const card = document.getElementById(`host-${hostData.ip.replace(/\./g, '-')}`);
       if (card) {
          card.querySelector('.host-body .info-row:nth-child(1) .value').innerText = hostData.hostname || 'Unknown';
          card.querySelector('.host-body .info-row:nth-child(2) .value').innerText = hostData.os || 'Unknown';
          card.querySelector('.host-body .info-row:nth-child(3) .value').innerText = hostData.vendor || 'Unknown';
       }
+      debouncedRenderAllHosts();
     } else {
       hosts.push(hostData);
-      renderHostCard(hostData);
+      debouncedRenderAllHosts();
     }
   });
 
@@ -426,6 +642,29 @@ if (window.electronAPI) {
     const btnRunDeepScan = document.getElementById('btn-run-deep-scan');
     if (btnRunDeepScan && btnRunDeepScan.getAttribute('data-ip') === data.ip && btnRunDeepScan.getAttribute('data-scanning') === 'true') {
       btnRunDeepScan.innerHTML = `<span class="icon">🛑</span> Cancel Scan (${data.percent}%)`;
+    }
+    
+    // Update global progress if part of Deep Scan All
+    if (isDeepScanningAll && deepScanAllActive.has(data.ip)) {
+      deepScanHostProgress[data.ip] = data.percent;
+      updateDeepScanAllProgress();
+    }
+
+    // Update individual host card
+    const card = document.getElementById(`host-${data.ip.replace(/\./g, '-')}`);
+    if (card) {
+      // Find the specific badge container for THIS card
+      const badgeContainer = card.querySelector('.security-badge-container');
+      if (badgeContainer) {
+        let progressBadge = badgeContainer.querySelector('.ds-progress-badge');
+        if (!progressBadge) {
+          progressBadge = document.createElement('span');
+          progressBadge.className = 'ds-progress-badge';
+          progressBadge.style.cssText = 'font-size: 11px; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--info); color: var(--text-main); background: rgba(94, 114, 235, 0.2); margin-left: 6px;';
+          badgeContainer.appendChild(progressBadge);
+        }
+        progressBadge.innerHTML = `⏳ ${data.percent}%`;
+      }
     }
   });
 
@@ -482,15 +721,7 @@ if (window.electronAPI) {
     const ip = document.getElementById('btn-run-deep-scan')?.getAttribute('data-ip');
     
     if (ip) {
-       if (data.port === 80 || data.port === 8080) {
-         actionsHtml = `<button class="btn-action" onclick="window.electronAPI.openExternalAction({type:'http', ip:'${ip}', port:${data.port}})"><span class="icon">🌐</span> Open HTTP</button>`;
-       } else if (data.port === 443 || data.port === 8443) {
-         actionsHtml = `<button class="btn-action" onclick="window.electronAPI.openExternalAction({type:'https', ip:'${ip}', port:${data.port}})"><span class="icon">🔒</span> Open HTTPS</button>`;
-       } else if (data.port === 22) {
-         actionsHtml = `<button class="btn-action" onclick="window.electronAPI.openExternalAction({type:'ssh', ip:'${ip}'})"><span class="icon">⌨️</span> Connect SSH</button>`;
-       } else if (data.port === 3389) {
-         actionsHtml = `<button class="btn-action" onclick="window.electronAPI.openExternalAction({type:'rdp', ip:'${ip}'})"><span class="icon">🖥️</span> Remote Desktop</button>`;
-       }
+      actionsHtml = getActionButtonsHtml(ip, data);
     }
 
     record.innerHTML = `
@@ -500,7 +731,7 @@ if (window.electronAPI) {
           <span class="ds-service">${data.serviceName}</span>
           ${actionTag}
         </div>
-        ${actionsHtml ? `<div class="ds-actions">${actionsHtml}</div>` : ''}
+        ${actionsHtml}
       </div>
       <div class="ds-details" style="${data.vulnerable ? 'color: var(--danger); font-weight: 500;' : ''}">${data.details}</div>
       ${bannerHtml}
@@ -528,6 +759,34 @@ if (window.electronAPI) {
       if (dsResults && dsResults.innerHTML.trim() === '') {
         dsResults.innerHTML = `<div class="ds-record" style="text-align:center; color: var(--text-muted); opacity: 0.7;">${wasCancelled ? 'Scan stopped before ports were found.' : 'No open ports discovered.'}</div>`;
       }
+    }
+
+    if (deepScanAllActive.has(ip)) {
+      deepScanHostProgress[ip] = 100; // Force to 100% just in case before removal
+      updateDeepScanAllProgress();
+      
+      // Delay removal slightly so the UI gets a chance to render 100%
+      setTimeout(() => {
+        if (deepScanAllActive.has(ip)) {
+          deepScanAllActive.delete(ip);
+          delete deepScanHostProgress[ip]; // Clean up memory
+          deepScanAllCompleted++;
+          if (isDeepScanningAll) {
+             pumpDeepScanQueue();
+             updateDeepScanAllProgress(); // Ensure 100% calculation reflects removed item
+          }
+        }
+      }, 500);
+    }
+    
+    // Refresh the card for this IP so the badge updates and the progress badge is removed
+    const card = document.getElementById(`host-${ip.replace(/\./g, '-')}`);
+    const host = hosts.find(h => h.ip === ip);
+    if (card && host) {
+       const badgeContainer = card.querySelector('.security-badge-container');
+       if (badgeContainer) {
+         badgeContainer.innerHTML = getSecurityBadgeHtml(host);
+       }
     }
   });
 }

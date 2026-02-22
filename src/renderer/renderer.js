@@ -356,16 +356,24 @@ btnStop.addEventListener('click', async () => {
 
 btnSave.addEventListener('click', async () => {
   const response = await window.electronAPI.saveResults(hosts);
-  statusText.innerText = 'Results saved.';
+  if (response.status === 'saved') {
+    statusText.innerText = `Results saved to ${response.path}`;
+  }
 });
 
 btnLoad.addEventListener('click', async () => {
   const response = await window.electronAPI.loadResults();
-  if (response.data) {
+  if (response.status === 'loaded' && response.data) {
     clearGrid();
     hosts = response.data;
+    
+    // Force empty state removal, as bulk loading bypasses 1x1 render checks
+    if (hosts.length > 0) {
+       emptyState.classList.add('hidden');
+    }
+    
     hosts.forEach(renderHostCard);
-    statusText.innerText = `Loaded ${hosts.length} hosts.`;
+    statusText.innerText = `Loaded ${hosts.length} hosts from ${response.path}`;
   }
 });
 

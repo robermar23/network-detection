@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -141,9 +141,16 @@ ipcMain.handle('open-external-action', async (event, { type, ip, port }) => {
 ipcMain.handle('save-results', async (event, results) => {
   console.log('Save requested', results?.length || 0);
   try {
-    const savePath = path.join(__dirname, '../../scan_results.json');
-    fs.writeFileSync(savePath, JSON.stringify(results, null, 2));
-    return { status: 'saved' };
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+      title: 'Save NetSpecter Scan',
+      defaultPath: path.join(app.getPath('documents'), 'scan_results.json'),
+      filters: [{ name: 'JSON Files', extensions: ['json'] }]
+    });
+
+    if (canceled || !filePath) return { status: 'cancelled' };
+
+    fs.writeFileSync(filePath, JSON.stringify(results, null, 2));
+    return { status: 'saved', path: filePath };
   } catch (e) {
     console.error('Save failed:', e);
     return { status: 'error', error: e.message };
@@ -153,11 +160,20 @@ ipcMain.handle('save-results', async (event, results) => {
 ipcMain.handle('load-results', async (event) => {
   console.log('Load requested');
   try {
-    const savePath = path.join(__dirname, '../../scan_results.json');
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+      title: 'Load NetSpecter Scan',
+      properties: ['openFile'],
+      filters: [{ name: 'JSON Files', extensions: ['json'] }]
+    });
+
+    if (canceled || filePaths.length === 0) return { status: 'cancelled' };
+
+    const savePath = filePaths[0];
     if (fs.existsSync(savePath)) {
       const data = JSON.parse(fs.readFileSync(savePath, 'utf8'));
-      return { status: 'loaded', data };
+      return { status: 'loaded', data, path: savePath };
     }
+    
     return { status: 'no_file' };
   } catch (e) {
     console.error('Load failed:', e);

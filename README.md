@@ -1,8 +1,8 @@
-# Network Host Detection & Forensic Scanner
+# NetSpecter: Network Host Detection & Forensic Scanner
 
 A modern, cross-platform desktop application built with Electron, Node.js, and Vanilla JS that provides deep network visibility, OS fingerprinting, and forensic-level port scanning functionalities.
 
-![App Dashboard Preview](https://via.placeholder.com/800x450.png?text=Network+Detection+Dashboard)
+![App Dashboard Preview](https://via.placeholder.com/800x450.png?text=NetSpecter+Dashboard)
 
 ## Features
 
@@ -40,8 +40,8 @@ Ensure you have the following installed on your machine:
 Clone the repository and install the Node dependencies.
 
 ```bash
-git clone https://github.com/robermar23/NetworkDetection.git
-cd NetworkDetection
+git clone https://github.com/robermar23/NetSpecter.git
+cd NetSpecter
 npm install
 ```
 

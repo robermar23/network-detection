@@ -194,25 +194,23 @@ function openDetailsPanel(host) {
     </div>
     <div class="info-row">
       <span class="label">Hostname</span>
-      <div class="value">${host.hostname || 'Unknown'}</div>
+      <div class="value" id="dp-hostname">${host.hostname || 'Unknown'}</div>
     </div>
     <div class="info-row">
       <span class="label">Operating System</span>
-      <div class="value">${host.os || 'Unknown'}</div>
+      <div class="value" id="dp-os">${host.os || 'Unknown'}</div>
     </div>
-    ${host.deviceType ? `
-    <div class="info-row">
+    <div class="info-row" id="dp-device-row" style="display: ${host.deviceType ? 'flex' : 'none'};">
       <span class="label">Device Type</span>
-      <div class="value">${host.deviceType}</div>
-    </div>` : ''}
-    ${host.kernel ? `
-    <div class="info-row">
+      <div class="value" id="dp-device">${host.deviceType || ''}</div>
+    </div>
+    <div class="info-row" id="dp-kernel-row" style="display: ${host.kernel ? 'flex' : 'none'};">
       <span class="label" style="min-width: 60px;">Kernel</span>
-      <div class="value" style="text-align: right;">${host.kernel}</div>
-    </div>` : ''}
+      <div class="value" id="dp-kernel" style="text-align: right;">${host.kernel || ''}</div>
+    </div>
     <div class="info-row">
       <span class="label">Hardware Vendor</span>
-      <div class="value">${host.vendor || 'Unknown'}</div>
+      <div class="value" id="dp-vendor">${host.vendor || 'Unknown'}</div>
     </div>
     
     <div style="margin-top: 10px; border-top: 1px solid var(--border-glass); padding-top: 16px;">
@@ -1120,8 +1118,8 @@ if (window.electronAPI) {
       // Extract OS
       if (type === 'host' || type === 'deep') {
         // OS Extraction
-        const osMatch1 = fullOutput.match(/OS details:\s*(.*?)(?:\n|$)/);
-        const osMatch2 = fullOutput.match(/Service Info:.*?OS:\s*([^;]+);/);
+        const osMatch1 = fullOutput.match(/OS details:\s*([^\r\n]+)/i);
+        const osMatch2 = fullOutput.match(/Service Info:.*?OS:\s*([^;]+);/i);
         const osName = (osMatch1 && osMatch1[1]) || (osMatch2 && osMatch2[1]);
         if (osName) {
            hosts[hostIdx].os = `(Nmap) ${osName.substring(0, 30)}`;
@@ -1140,21 +1138,21 @@ if (window.electronAPI) {
         }
 
         // Hardware Vendor Extraction (from MAC Address line)
-        const macMatch = fullOutput.match(/MAC Address:\s*[0-9A-Fa-f:]+\s*\((.*?)\)/);
+        const macMatch = fullOutput.match(/MAC Address:\s*[0-9A-Fa-f:]{17}\s*\(([^\)]+)\)/i);
         if (macMatch && macMatch[1] && macMatch[1] !== 'Unknown') {
            hosts[hostIdx].vendor = macMatch[1];
            metadataChanged = true;
         }
 
         // Device Type Extraction
-        const deviceMatch = fullOutput.match(/Device type:\s*(.*?)\n/);
+        const deviceMatch = fullOutput.match(/Device type:\s*([^\r\n]+)/i);
         if (deviceMatch && deviceMatch[1]) {
            hosts[hostIdx].deviceType = deviceMatch[1];
            metadataChanged = true;
         }
 
         // Kernel Extraction
-        const kernelMatch = fullOutput.match(/Running(?:\s*\(JUST GUESSING\))?:\s*(.*?)\n/);
+        const kernelMatch = fullOutput.match(/Running(?:\s*\(JUST GUESSING\))?:\s*([^\r\n]+)/i);
         if (kernelMatch && kernelMatch[1]) {
            hosts[hostIdx].kernel = kernelMatch[1];
            metadataChanged = true;
@@ -1185,9 +1183,28 @@ if (window.electronAPI) {
         // Also cleanly update the specific opened Details panel port map if it's the active one
         const btnRunDeepScan = document.getElementById('btn-run-deep-scan');
         if (btnRunDeepScan && btnRunDeepScan.getAttribute('data-ip') === ip) {
-           // Sneaky UI refresh - if we changed data beneath an open panel, ideally refresh the entire panel.
-           // However keeping state stable is preferable. A full UI redesign might be needed, but for now
-           // just letting the user see the badges on the main view is enough per the spec "displayed in the main application dashboard".
+           const elOs = document.getElementById('dp-os');
+           if (elOs) elOs.innerText = hosts[hostIdx].os || 'Unknown';
+
+           const elHostname = document.getElementById('dp-hostname');
+           if (elHostname) elHostname.innerText = hosts[hostIdx].hostname || 'Unknown';
+
+           const elVendor = document.getElementById('dp-vendor');
+           if (elVendor) elVendor.innerText = hosts[hostIdx].vendor || 'Unknown';
+           
+           const elDevice = document.getElementById('dp-device');
+           const elDeviceRow = document.getElementById('dp-device-row');
+           if (elDeviceRow && hosts[hostIdx].deviceType) {
+              elDeviceRow.style.display = 'flex';
+              if (elDevice) elDevice.innerText = hosts[hostIdx].deviceType;
+           }
+
+           const elKernel = document.getElementById('dp-kernel');
+           const elKernelRow = document.getElementById('dp-kernel-row');
+           if (elKernelRow && hosts[hostIdx].kernel) {
+              elKernelRow.style.display = 'flex';
+              if (elKernel) elKernel.innerText = hosts[hostIdx].kernel;
+           }
         }
       }
     }

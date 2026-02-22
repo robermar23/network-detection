@@ -90,3 +90,7 @@ You are working on an Electron desktop application using Javascript, with a clea
 - Minimize the main process workload; delegate heavy computation to child processes.
 - Monitor and limit the number of open `BrowserWindow` instances to control memory consumption.
 - Use `v8-compile-cache` or snapshot-based optimizations for faster main process startup.
+
+## Documentation
+- Maintain feature and developer friendly readme.md file
+- Maintain a getting-started-guide.md that describes in detail how to get started, every feature and option.

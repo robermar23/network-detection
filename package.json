@@ -7,15 +7,19 @@
   "scripts": {
     "dev": "concurrently -k \"vite\" \"cross-env NODE_ENV=development electron .\"",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run --dir ./test"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
     "electron": "^40.6.0",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18"
   },
   "dependencies": {
+    "electron-store": "^11.0.2",
+    "electron-updater": "^6.8.3",
     "local-network-scanner": "^0.2.0",
     "ping": "^1.0.0",
     "split2": "^4.2.0"

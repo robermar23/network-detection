@@ -1,10 +1,13 @@
 import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
+import { autoUpdater } from 'electron-updater';
+import { IPC_CHANNELS } from '../shared/ipc.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { spawn, exec } from 'child_process';
 import { startNetworkScan, stopNetworkScan, getNetworkInterfaces } from './scanner.js';
 import { runDeepScan, cancelDeepScan } from './deepScanner.js';
+import { createMainWindow } from './windowManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,39 +17,11 @@ const isDev = process.env.NODE_ENV === 'development';
 let mainWindow;
 
 function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 800,
-    minHeight: 600,
-    titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#1e1e24',
-      symbolColor: '#ffffff',
-      height: 35
-    },
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-    show: false,
-    backgroundColor: '#0f0f13'
-  });
-
-  if (isDev) {
-    // Load from Vite dev server
-    mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
-  } else {
-    // Load from Production Build
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
-  }
-
-  // Graceful show to prevent white flashing
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-  });
+  mainWindow = createMainWindow(
+    isDev, 
+    (p) => path.join(__dirname, p), 
+    'http://localhost:5173'
+  );
 }
 
 app.whenReady().then(() => {
@@ -55,6 +30,32 @@ app.whenReady().then(() => {
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+
+  // Init Auto-Updater
+  autoUpdater.logger = console;
+  autoUpdater.checkForUpdatesAndNotify();
+
+  autoUpdater.on('update-available', () => {
+    console.log('Update available.');
+  });
+
+  autoUpdater.on('download-progress', (progressObj) => {
+    console.log(`Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}% (${progressObj.transferred}/${progressObj.total})`);
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    console.log('Update downloaded. Prompting user to install.');
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'Update Ready',
+      message: 'A new version of NetSpecter is ready. Quit and Install now?',
+      buttons: ['Yes', 'Later']
+    }).then((result) => {
+      if (result.response === 0) {
+        autoUpdater.quitAndInstall();
+      }
+    });
+  });
 });
 
 app.on('window-all-closed', function () {
@@ -62,36 +63,36 @@ app.on('window-all-closed', function () {
 });
 
 // IPC Handler stubs for future Network Scanner logic
-ipcMain.handle('get-interfaces', async () => {
+ipcMain.handle(IPC_CHANNELS.GET_INTERFACES, async () => {
   return getNetworkInterfaces();
 });
 
-ipcMain.handle('scan-network', async (event, subnet) => {
+ipcMain.handle(IPC_CHANNELS.SCAN_NETWORK, async (event, subnet) => {
   console.log(`Scan requested on subnet: ${subnet}`);
   
   startNetworkScan(
     subnet,
     (hostData) => {
-      if (mainWindow) mainWindow.webContents.send('host-found', hostData);
+      if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.HOST_FOUND, hostData);
     },
     (completeMsg) => {
-      if (mainWindow) mainWindow.webContents.send('scan-complete', completeMsg);
+      if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.SCAN_COMPLETE, completeMsg);
     }
   );
 
   return { status: 'scanning' };
 });
 
-ipcMain.handle('deep-scan-host', async (event, ip) => {
+ipcMain.handle(IPC_CHANNELS.RUN_DEEP_SCAN, async (event, ip) => {
   console.log(`Deep scan requested for ${ip}`);
   
   // Run asynchronously without blocking
   runDeepScan(ip, (portData) => {
-    if (mainWindow) mainWindow.webContents.send('deep-scan-result', { ip, ...portData });
+    if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.DEEP_SCAN_RESULT, { ip, ...portData });
   }, (progressData) => {
-    if (mainWindow) mainWindow.webContents.send('deep-scan-progress', progressData);
+    if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.DEEP_SCAN_PROGRESS, progressData);
   }).then(() => {
-    if (mainWindow) mainWindow.webContents.send('deep-scan-complete', { ip });
+    if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.DEEP_SCAN_COMPLETE, { ip });
   }).catch(err => {
     console.error(`Deep scan error on ${ip}:`, err);
   });
@@ -99,20 +100,36 @@ ipcMain.handle('deep-scan-host', async (event, ip) => {
   return { status: 'started' };
 });
 
-ipcMain.handle('cancel-deep-scan', async (event, ip) => {
+ipcMain.handle(IPC_CHANNELS.CANCEL_DEEP_SCAN, async (event, ip) => {
   console.log(`Deep scan cancel requested for ${ip}`);
   cancelDeepScan(ip);
   return { status: 'cancelled' };
 });
 
-ipcMain.handle('stop-scan', async (event) => {
+ipcMain.handle(IPC_CHANNELS.STOP_SCAN, async (event) => {
   console.log('Stop requested');
   stopNetworkScan();
   return { status: 'stopped' };
 });
 
-ipcMain.handle('open-external-action', async (event, { type, ip, port }) => {
+ipcMain.handle(IPC_CHANNELS.OPEN_EXTERNAL_ACTION, async (event, { type, ip, port }) => {
   console.log(`External action requested: ${type} to ${ip}:${port}`);
+  
+  // Detailed Security Payload Validation
+  const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+  if (!ip || !ipRegex.test(ip)) {
+     console.error('INVALID IP FORMAT REJECTED');
+     return { success: false, error: 'Invalid IP address format' };
+  }
+  
+  if (port) {
+     const parsedPort = parseInt(port, 10);
+     if (isNaN(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
+       console.error('INVALID PORT BOUNDS REJECTED');
+       return { success: false, error: 'Invalid port number' };
+     }
+  }
+
   try {
     if (type === 'http' || type === 'https') {
       await shell.openExternal(`${type}://${ip}${port ? ':' + port : ''}`);
@@ -138,7 +155,7 @@ ipcMain.handle('open-external-action', async (event, { type, ip, port }) => {
   }
 });
 
-ipcMain.handle('save-results', async (event, results) => {
+ipcMain.handle(IPC_CHANNELS.SAVE_RESULTS, async (event, results) => {
   console.log('Save requested', results?.length || 0);
   try {
     const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
@@ -157,7 +174,7 @@ ipcMain.handle('save-results', async (event, results) => {
   }
 });
 
-ipcMain.handle('load-results', async (event) => {
+ipcMain.handle(IPC_CHANNELS.LOAD_RESULTS, async (event) => {
   console.log('Load requested');
   try {
     const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
@@ -181,11 +198,11 @@ ipcMain.handle('load-results', async (event) => {
   }
 });
 
-ipcMain.handle('clear-results', async (event) => {
+ipcMain.handle(IPC_CHANNELS.CLEAR_RESULTS, async (event) => {
   console.log('Clear requested');
   return { status: 'cleared' };
 });
 
-ipcMain.on('exit-app', () => {
+ipcMain.on(IPC_CHANNELS.EXIT_APP, () => {
   app.quit();
 });

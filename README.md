@@ -39,7 +39,7 @@ Ensure you have the following installed on your machine:
 Clone the repository and install the Node dependencies.
 
 ```bash
-git clone https://github.com/YourUsername/NetworkDetection.git
+git clone https://github.com/robermar23/NetworkDetection.git
 cd NetworkDetection
 npm install
 ```

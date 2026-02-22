@@ -65,6 +65,38 @@ btnRefreshInterfaces.addEventListener('click', () => {
 
 // --- Details Panel ---
 function openDetailsPanel(host) {
+  // Build previously saved Deep Scan results (if any)
+  let savedDeepScanHtml = '';
+  if (host.deepAudit && host.deepAudit.history && host.deepAudit.history.length > 0) {
+     host.deepAudit.history.forEach(data => {
+        let bannerHtml = '';
+        if (data.rawBanner) {
+           const safeBanner = data.rawBanner.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+           bannerHtml = `<div class="ds-banner">${safeBanner}</div>`;
+        }
+
+        let actionTag = '';
+        if (data.vulnerable) {
+           const cl = data.severity === 'critical' ? 'danger' : 'warning';
+           actionTag = `<span style="font-size: 10px; color: var(--${cl}); border: 1px solid var(--${cl}); padding: 2px 4px; border-radius: 2px;">${data.severity.toUpperCase()}</span>`;
+        }
+        
+        savedDeepScanHtml += `
+          <div class="ds-record" style="${data.vulnerable ? 'border-left-color: var(--danger); background: rgba(235,94,94,0.05);' : ''}">
+            <div class="ds-header">
+              <div class="ds-header-title">
+                <span class="ds-port">PORT ${data.port}</span>
+                <span class="ds-service">${data.serviceName}</span>
+                ${actionTag}
+              </div>
+            </div>
+            <div class="ds-details" style="${data.vulnerable ? 'color: var(--danger); font-weight: 500;' : ''}">${data.details}</div>
+            ${bannerHtml}
+          </div>
+        `;
+     });
+  }
+
   detailsContent.innerHTML = `
     <div class="info-row">
       <span class="label">IP Address</span>
@@ -98,10 +130,10 @@ function openDetailsPanel(host) {
     
     <div class="deep-scan-container">
       <button id="btn-run-deep-scan" class="btn warning full-width" data-ip="${host.ip}">
-        <span class="icon">☢️</span> Run Deep Scan
+        <span class="icon">☢️</span> ${host.deepAudit ? 'Re-Run Deep Scan' : 'Run Deep Scan'}
       </button>
       <div id="deep-scan-results" class="deep-scan-results">
-        <!-- Live deep scan data injected here -->
+        ${savedDeepScanHtml}
       </div>
     </div>
   `;
@@ -125,6 +157,12 @@ function openDetailsPanel(host) {
     btnRunDeepScan.classList.remove('warning');
     btnRunDeepScan.innerHTML = `<span class="icon">🛑</span> Cancel Scan...`;
     dsResults.innerHTML = ''; // clear previous
+    
+    // Reset Data State
+    const hostIdx = hosts.findIndex(h => h.ip === host.ip);
+    if (hostIdx >= 0) {
+      hosts[hostIdx].deepAudit = { history: [], vulnerabilities: 0, warnings: 0 };
+    }
     
     await window.electronAPI.runDeepScan(host.ip);
   });
@@ -159,6 +197,39 @@ function setScanningState(scanning) {
 
 // --- Dynamic Rendering ---
 
+function getSecurityBadgeHtml(host) {
+  let posture = 'Protected';
+  let badgeClass = 'success';
+  let icon = '🛡️';
+
+  // Has it been deeply audited yet?
+  if (host.deepAudit) {
+    if (host.deepAudit.vulnerabilities > 0) {
+      posture = 'Vulnerable';
+      badgeClass = 'danger';
+      icon = '🛑';
+    } else if (host.deepAudit.warnings > 0) {
+      posture = 'Warning';
+      badgeClass = 'warning';
+      icon = '⚠️';
+    }
+  } else if (host.ports && host.ports.length > 0) {
+    // Basic heuristics based just on surface port sweep
+    const p = new Set(host.ports);
+    if (p.has(21) || p.has(23) || p.has(3306) || p.has(1433) || p.has(27017)) {
+       posture = 'Vulnerable';
+       badgeClass = 'danger';
+       icon = '🛑';
+    } else if (p.has(80) || p.has(445) || p.has(135)) {
+       posture = 'Warning';
+       badgeClass = 'warning';
+       icon = '⚠️';
+    }
+  }
+
+  return `<span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--${badgeClass}); color: var(--${badgeClass}); background: rgba(0,0,0,0.2);">${icon} ${posture}</span>`;
+}
+
 function renderHostCard(host) {
   // Hide empty state if this is the first item
   if (hosts.length === 1) {
@@ -172,9 +243,14 @@ function renderHostCard(host) {
 
   card.innerHTML = `
     <div class="status-indicator online"></div>
-    <div class="host-header">
-      <h3>${host.ip}</h3>
-      <p class="mac">${host.mac || 'Unknown MAC'}</p>
+    <div class="host-header" style="display:flex; justify-content: space-between; align-items: flex-start;">
+      <div>
+        <h3>${host.ip}</h3>
+        <p class="mac">${host.mac || 'Unknown MAC'}</p>
+      </div>
+      <div class="security-badge-container">
+         ${getSecurityBadgeHtml(host)}
+      </div>
     </div>
     <div class="host-body">
       <div class="info-row"><span class="label">Hostname:</span> <span class="value" title="${host.hostname}">${host.hostname || 'Unknown'}</span></div>
@@ -294,17 +370,51 @@ if (window.electronAPI) {
   });
 
   window.electronAPI.onDeepScanResult((data) => {
+    // 1. Permanently Save to Host State (For JSON Export & Live Score Retallying)
+    const hostIdx = hosts.findIndex(h => h.ip === data.ip);
+    if (hostIdx >= 0) {
+       // Initialize structure if first port
+       if (!hosts[hostIdx].deepAudit) {
+         hosts[hostIdx].deepAudit = { history: [], vulnerabilities: 0, warnings: 0 };
+       }
+       
+       // Deduplicate
+       if (!hosts[hostIdx].deepAudit.history.some(h => h.port === data.port)) {
+         hosts[hostIdx].deepAudit.history.push(data);
+         if (data.vulnerable && data.severity === 'critical') hosts[hostIdx].deepAudit.vulnerabilities++;
+         if (data.vulnerable && data.severity === 'warning') hosts[hostIdx].deepAudit.warnings++;
+         
+         // Dynamically re-render the card Security Badge safely
+         const card = document.getElementById(`host-${data.ip.replace(/\\./g, '-')}`);
+         if (card) {
+            const badgeContainer = card.querySelector('.security-badge-container');
+            if (badgeContainer) badgeContainer.innerHTML = getSecurityBadgeHtml(hosts[hostIdx]);
+         }
+       }
+    }
+
+    // 2. Stream to Live Feed UI if panel is open
     const dsResults = document.getElementById('deep-scan-results');
     if (!dsResults) return; // Panel closed
 
     const record = document.createElement('div');
     record.className = 'ds-record';
+    if (data.vulnerable) {
+      record.style.borderLeftColor = 'var(--danger)';
+      record.style.background = 'rgba(235,94,94,0.05)';
+    }
     
     let bannerHtml = '';
     if (data.rawBanner) {
        // Escape basic HTML
        const safeBanner = data.rawBanner.replace(/</g, "&lt;").replace(/>/g, "&gt;");
        bannerHtml = `<div class="ds-banner">${safeBanner}</div>`;
+    }
+
+    let actionTag = '';
+    if (data.vulnerable) {
+       const cl = data.severity === 'critical' ? 'danger' : 'warning';
+       actionTag = `<span style="font-size: 10px; color: var(--${cl}); border: 1px solid var(--${cl}); margin-left: 8px; padding: 2px 4px; border-radius: 2px;">${data.severity.toUpperCase()}</span>`;
     }
 
     // Determine Action Buttons
@@ -328,10 +438,11 @@ if (window.electronAPI) {
         <div class="ds-header-title">
           <span class="ds-port">PORT ${data.port}</span>
           <span class="ds-service">${data.serviceName}</span>
+          ${actionTag}
         </div>
         ${actionsHtml ? `<div class="ds-actions">${actionsHtml}</div>` : ''}
       </div>
-      <div class="ds-details">${data.details}</div>
+      <div class="ds-details" style="${data.vulnerable ? 'color: var(--danger); font-weight: 500;' : ''}">${data.details}</div>
       ${bannerHtml}
     `;
     

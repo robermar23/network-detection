@@ -1,4 +1,4 @@
-import { spawn, exec } from 'child_process';
+import { spawn, exec, execSync } from 'child_process';
 import os from 'os';
 
 const activeScans = new Map(); // Store child processes by ID (ip or subnet)
@@ -22,12 +22,17 @@ export function cancelNmapScan(id) {
   return false;
 }
 
-export async function runNmapScan(type, target, onResultCallback, onCompleteCallback, onErrorCallback) {
+export async function runNmapScan(type, targetObj, onResultCallback, onCompleteCallback, onErrorCallback) {
   const isInstalled = await checkNmapInstalled();
   if (!isInstalled) {
     onErrorCallback({ error: 'Nmap is not installed or not in PATH.' });
     return;
   }
+
+  // Support both old string format and new object format
+  const target = typeof targetObj === 'string' ? targetObj : targetObj.ip;
+  const scriptName = targetObj.scriptName;
+  const scriptArgs = targetObj.args;
 
   // Define arguments based on scan type
   let args = [];
@@ -37,6 +42,13 @@ export async function runNmapScan(type, target, onResultCallback, onCompleteCall
   } else if (type === 'vuln') {
     // Vulnerability script scan
     args = ['-Pn', '-sV', '--script', 'vuln', '--stats-every', '3s', target];
+  } else if (type === 'custom') {
+    // Custom script execution from the NSE Explorer
+    args = ['-Pn', '-sV', '--script', scriptName];
+    if (scriptArgs && scriptArgs.trim() !== '') {
+       args.push('--script-args', scriptArgs.trim());
+    }
+    args.push('--stats-every', '3s', target);
   } else if (type === 'host') {
     // Standard aggressive scan for a single host
     args = ['-Pn', '-A', '-T4', '--stats-every', '3s', target];
@@ -143,4 +155,122 @@ export async function runNcat({ target, port, payload }, onResultCallback, onCom
     console.error('Ncat spawn error:', err);
     onErrorCallback({ error: err.message });
   });
+}
+
+// ==========================================
+// Nmap Scripting Engine (NSE) Discovery
+// ==========================================
+
+import fs from 'fs';
+import path from 'path';
+
+export async function getNmapScripts() {
+  const isInstalled = await checkNmapInstalled();
+  if (!isInstalled) return [];
+
+  let scriptsDirs = [];
+
+  // 1. Try to dynamically resolve from system PATH
+  try {
+    const cmd = process.platform === 'win32' ? 'where nmap' : 'which nmap';
+    const out = execSync(cmd, { encoding: 'utf8' }).trim();
+    const nmapExePath = out.split('\n')[0].trim(); // `where` can return multiple lines
+    
+    if (nmapExePath && fs.existsSync(nmapExePath)) {
+      const binDir = path.dirname(nmapExePath);
+      if (process.platform === 'win32') {
+        // Windows: scripts/ is adjacent to nmap.exe
+        scriptsDirs.push(path.join(binDir, 'scripts'));
+      } else {
+        // Unix: usually ../share/nmap/scripts relative to bin/
+        scriptsDirs.push(path.join(path.dirname(binDir), 'share', 'nmap', 'scripts'));
+        // Fallback if portable: adjacent to binary
+        scriptsDirs.push(path.join(binDir, 'scripts'));
+      }
+    }
+  } catch (e) {
+    console.log('Dynamic nmap path resolution failed:', e.message);
+  }
+
+  // 2. Add standard OS default fallbacks
+  if (process.platform === 'win32') {
+    scriptsDirs.push(
+      path.join(process.env.PROGRAMFILES || 'C:\\Program Files', 'Nmap', 'scripts'),
+      path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'Nmap', 'scripts')
+    );
+  } else if (process.platform === 'darwin') {
+    scriptsDirs.push(
+      '/usr/local/share/nmap/scripts',
+      '/opt/homebrew/share/nmap/scripts'
+    );
+  } else {
+    scriptsDirs.push(
+      '/usr/share/nmap/scripts',
+      '/usr/local/share/nmap/scripts'
+    );
+  }
+
+  // De-duplicate array
+  scriptsDirs = [...new Set(scriptsDirs)];
+
+  let activeDir = null;
+  for (const dir of scriptsDirs) {
+    if (fs.existsSync(dir)) {
+      activeDir = dir;
+      break;
+    }
+  }
+
+  if (!activeDir) {
+    console.warn('Could not locate Nmap scripts directory natively.');
+    return [];
+  }
+
+  console.log(`Discovered Nmap scripts directory at: ${activeDir}`);
+  const scripts = [];
+
+  try {
+    const files = fs.readdirSync(activeDir);
+    for (const file of files) {
+      if (file.endsWith('.nse')) {
+        const fullPath = path.join(activeDir, file);
+        const id = file.replace('.nse', '');
+        
+        // Read the first 2KB of the script to find the categories string
+        // We do this synchronously but with a small buffer for speed.
+        const fd = fs.openSync(fullPath, 'r');
+        const buffer = Buffer.alloc(2048);
+        const bytesRead = fs.readSync(fd, buffer, 0, 2048, 0);
+        fs.closeSync(fd);
+        
+        const content = buffer.toString('utf8', 0, bytesRead);
+        
+        // Match `categories = {"safe", "discovery"}`
+        let categories = ['uncategorized'];
+        const catMatch = content.match(/categories\s*=\s*\{([^}]+)\}/);
+        if (catMatch && catMatch[1]) {
+           // Parse `"safe", "discovery"` into actual array ['safe', 'discovery']
+           categories = catMatch[1]
+             .split(',')
+             .map(c => c.replace(/['"\s]/g, ''))
+             .filter(c => c.length > 0);
+        }
+
+        scripts.push({
+          id,
+          categories
+        });
+      }
+    }
+    
+    // Sort alphabetically by script id
+    scripts.sort((a,b) => a.id.localeCompare(b.id));
+
+    console.log(`Successfully parsed ${scripts.length} Nmap scripts.`);
+    return scripts;
+    
+  } catch (e) {
+    console.error('Error reading Nmap scripts directory:', e);
+    return [];
+  }
 }

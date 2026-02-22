@@ -37,12 +37,17 @@ let sortDirection = 'asc'; // 'asc', 'desc'
 let isScanning = false;
 let hosts = []; // Store host objects
 let isNmapInstalled = false;
+let nmapScripts = []; // Store custom Nmap scripts catalog
 
 // Check Nmap Installation on load
-window.electronAPI.checkNmap().then(installed => {
+window.electronAPI.checkNmap().then(async (installed) => {
   isNmapInstalled = installed;
   if (!installed) {
     document.getElementById('nmap-install-banner').style.display = 'block';
+  } else {
+    // If Nmap is installed, pre-fetch the available scripts catalog natively
+    nmapScripts = await window.electronAPI.getNmapScripts();
+    console.log(`Loaded ${nmapScripts.length} native Nmap scripts from backend.`);
   }
 });
 
@@ -262,6 +267,20 @@ function openDetailsPanel(host) {
         <button id="btn-nmap-vuln" class="btn danger full-width" data-ip="${host.ip}" title="Run Nmap vulnerability scripts">
           <span class="icon">🛡️</span> Nmap Vuln Scan (Scripts)
         </button>
+        
+        <div style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">
+           <span style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 6px;">Nmap Scripting Engine (NSE) Explorer</span>
+           <div style="display: flex; flex-direction: column; gap: 6px;">
+              <div style="position: relative;">
+                 <input type="text" id="nse-search-input" class="text-input full-width" placeholder="Search ${nmapScripts.length} scripts (e.g. smb-)" autocomplete="off">
+                 <div id="nse-dropdown" class="nse-dropdown"></div>
+              </div>
+              <input type="text" id="nse-args-input" class="text-input full-width" placeholder="Optional: --script-args user=admin">
+              <button id="btn-nmap-custom" class="btn primary full-width" data-ip="${host.ip}" disabled>
+                 <span class="icon">🚀</span> Run Custom Script
+              </button>
+           </div>
+        </div>
       </div>
 
       <!-- Ncat Actions -->
@@ -499,6 +518,103 @@ function attachDetailsPanelListeners(host) {
   document.getElementById('btn-nmap-deep').addEventListener('click', () => handleNmapScan('btn-nmap-deep', 'deep', 'Deep Scan'));
   document.getElementById('btn-nmap-host').addEventListener('click', () => handleNmapScan('btn-nmap-host', 'host', 'Host Scan'));
   document.getElementById('btn-nmap-vuln').addEventListener('click', () => handleNmapScan('btn-nmap-vuln', 'vuln', 'Vuln Scan'));
+
+  // NSE Autocomplete Logic
+  const nseSearchInput = document.getElementById('nse-search-input');
+  const nseDropdown = document.getElementById('nse-dropdown');
+  const btnNmapCustom = document.getElementById('btn-nmap-custom');
+  const nseArgsInput = document.getElementById('nse-args-input');
+  let selectedNseScript = null;
+
+  if (nseSearchInput && nseDropdown) {
+     function renderNseDropdown(filterText = '') {
+        nseDropdown.innerHTML = '';
+        if (!filterText) {
+           nseDropdown.classList.remove('show');
+           return;
+        }
+
+        const lowerFilter = filterText.toLowerCase();
+        const matches = nmapScripts.filter(s => s.id.toLowerCase().includes(lowerFilter)).slice(0, 50); // limit 50
+
+        if (matches.length === 0) {
+           nseDropdown.innerHTML = `<div style="padding: 8px; color: var(--text-muted); font-size: 11px;">No scripts found.</div>`;
+        } else {
+           matches.forEach(script => {
+              const item = document.createElement('div');
+              item.className = 'nse-dropdown-item';
+              
+              // Build tiny category badges
+              let badgesHtml = '';
+              script.categories.forEach(cat => {
+                 let color = 'gray';
+                 if (cat === 'safe') color = 'var(--success)';
+                 if (cat === 'discovery') color = 'var(--info)';
+                 if (cat === 'vuln' || cat === 'exploit') color = 'var(--danger)';
+                 if (cat === 'intrusive' || cat === 'dos' || cat === 'brute') color = 'var(--warning)';
+                 badgesHtml += `<span style="font-size: 9px; padding: 1px 4px; border-radius: 2px; border: 1px solid ${color}; color: ${color}; margin-right: 4px;">${cat}</span>`;
+              });
+
+              item.innerHTML = `
+                 <div style="font-weight: 500; color: var(--text-main);">${script.id}</div>
+                 <div style="margin-top: 2px;">${badgesHtml}</div>
+              `;
+              
+              item.addEventListener('click', () => {
+                 selectedNseScript = script.id;
+                 nseSearchInput.value = script.id;
+                 nseDropdown.classList.remove('show');
+                 btnNmapCustom.disabled = false;
+              });
+
+              nseDropdown.appendChild(item);
+           });
+        }
+        nseDropdown.classList.add('show');
+     }
+
+     nseSearchInput.addEventListener('input', (e) => {
+        selectedNseScript = null;
+        btnNmapCustom.disabled = true;
+        renderNseDropdown(e.target.value);
+     });
+
+     // Hide dropdown when clicking outside
+     document.addEventListener('click', (e) => {
+        if (!nseSearchInput.contains(e.target) && !nseDropdown.contains(e.target)) {
+           nseDropdown.classList.remove('show');
+        }
+     });
+
+     // Custom Exec Logic
+     btnNmapCustom.addEventListener('click', async () => {
+        if (!selectedNseScript || btnNmapCustom.disabled) return;
+        
+        if (btnNmapCustom.getAttribute('data-scanning') === 'true') {
+          window.electronAPI.cancelNmapScan(host.ip);
+          btnNmapCustom.innerHTML = `<span class="icon">🛑</span> Cancelling...`;
+          btnNmapCustom.setAttribute('data-scanning', 'cancelling');
+          return;
+        }
+
+        btnNmapCustom.setAttribute('data-scanning', 'true');
+        btnNmapCustom.classList.add('pulsing', 'danger-pulsing');
+        btnNmapCustom.innerHTML = `<span class="icon">🛑</span> Cancel Custom Script...`;
+
+        // Clear existing stream block
+        let newBlock = document.createElement('div');
+        newBlock.className = 'ds-record';
+        newBlock.id = `nmap-live-custom`;
+        newBlock.innerHTML = `<div class="ds-service">Live NSE Execution (${selectedNseScript})</div><div class="ds-banner" id="nmap-live-banner-custom">Initializing...</div>`;
+        nmapScanResults.prepend(newBlock);
+
+        await window.electronAPI.runNmapScan('custom', {
+           ip: host.ip,
+           scriptName: selectedNseScript,
+           args: nseArgsInput.value
+        });
+     });
+  }
 
   // Clickable ports logic
   document.querySelectorAll('.port-item').forEach(el => {
@@ -1342,6 +1458,7 @@ if (window.electronAPI) {
       'deep': 'btn-nmap-deep',
       'host': 'btn-nmap-host',
       'vuln': 'btn-nmap-vuln',
+      'custom': 'btn-nmap-custom',
       'port': `btn-nmap-port-${port}`,
       'ncat': 'btn-run-ncat'
     };
@@ -1374,7 +1491,7 @@ if (window.electronAPI) {
     
     const target = data.target;
     const port = type === 'port' ? target.split(':')[1] : null;
-    const btnIds = { 'deep': 'btn-nmap-deep', 'host': 'btn-nmap-host', 'vuln': 'btn-nmap-vuln', 'port': `btn-nmap-port-${port}`, 'ncat': 'btn-run-ncat' };
+    const btnIds = { 'deep': 'btn-nmap-deep', 'host': 'btn-nmap-host', 'vuln': 'btn-nmap-vuln', 'custom': 'btn-nmap-custom', 'port': `btn-nmap-port-${port}`, 'ncat': 'btn-run-ncat' };
     const btn = document.getElementById(btnIds[type]);
     if (btn) {
       btn.classList.remove('pulsing', 'danger-pulsing');

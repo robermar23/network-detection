@@ -8,7 +8,7 @@ import fs from 'fs';
 import { spawn, exec } from 'child_process';
 import { startNetworkScan, stopNetworkScan, getNetworkInterfaces } from './scanner.js';
 import { runDeepScan, cancelDeepScan } from './deepScanner.js';
-import { checkNmapInstalled, runNmapScan, cancelNmapScan, runNcat } from './nmapScanner.js';
+import { checkNmapInstalled, runNmapScan, cancelNmapScan, runNcat, getNmapScripts } from './nmapScanner.js';
 import { createMainWindow } from './windowManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -112,8 +112,9 @@ ipcMain.handle(IPC_CHANNELS.CHECK_NMAP, async () => {
   return await checkNmapInstalled();
 });
 
-ipcMain.handle(IPC_CHANNELS.RUN_NMAP_SCAN, async (event, { type, target }) => {
-  console.log(`Nmap scan requested: ${type} on ${target}`);
+ipcMain.handle(IPC_CHANNELS.RUN_NMAP_SCAN, async (event, payload) => {
+  const { type, target } = payload;
+  console.log(`Nmap scan requested: ${type} on ${typeof target === 'string' ? target : target.ip}`);
   
   runNmapScan(type, target, 
     (chunkData) => {
@@ -134,6 +135,10 @@ ipcMain.handle(IPC_CHANNELS.CANCEL_NMAP_SCAN, async (event, target) => {
   console.log(`Nmap scan cancel requested for ${target}`);
   const success = cancelNmapScan(target);
   return { status: success ? 'cancelled' : 'not_found' };
+});
+
+ipcMain.handle(IPC_CHANNELS.GET_NMAP_SCRIPTS, async () => {
+  return await getNmapScripts();
 });
 
 ipcMain.handle(IPC_CHANNELS.RUN_NCAT, async (event, payloadObj) => {

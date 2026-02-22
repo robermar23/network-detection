@@ -25,6 +25,7 @@ var IPC_CHANNELS = {
   CHECK_NMAP: "check-nmap",
   RUN_NMAP_SCAN: "run-nmap-scan",
   CANCEL_NMAP_SCAN: "cancel-nmap-scan",
+  GET_NMAP_SCRIPTS: "get-nmap-scripts",
   RUN_NCAT: "run-ncat",
   NMAP_SCAN_RESULT: "nmap-scan-result",
   NMAP_SCAN_COMPLETE: "nmap-scan-complete",
@@ -46,7 +47,8 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
   openExternalAction: (payload) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.OPEN_EXTERNAL_ACTION, payload),
   // Nmap Triggers
   checkNmap: () => import_electron.ipcRenderer.invoke(IPC_CHANNELS.CHECK_NMAP),
-  runNmapScan: (type, target) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.RUN_NMAP_SCAN, { type, target }),
+  getNmapScripts: () => import_electron.ipcRenderer.invoke(IPC_CHANNELS.GET_NMAP_SCRIPTS),
+  runNmapScan: (type, targetObj) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.RUN_NMAP_SCAN, { type, target: targetObj }),
   runNcat: (payloadObj) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.RUN_NCAT, payloadObj),
   cancelNmapScan: (target) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.CANCEL_NMAP_SCAN, target),
   // Event Listeners for streams

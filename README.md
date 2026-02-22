@@ -14,7 +14,17 @@ A modern, cross-platform desktop application built with Electron, Node.js, and V
 - **Native Forensic Auditing**: Triggers active vulnerability probes (such as Anonymous FTP login attempts and `/.env` or `/.git/config` web fuzzing) against discovered services. Automatically calculates a surface-level Security Posture Score (🛡️ Protected, ⚠️ Warning, 🛑 Vulnerable) for every host on the subnet.
 - **Actionable Connect Bridges**: The UI intelligently parses discovered services and injects native workflow buttons. Instantly launch your OS's native SSH Terminal, RDP Client, or Default Web Browser directly against the target host with a single click.
 - **Data Persistence**: Offline session persistence allows saving all network scan states, deep scan vulnerabilities, banners, and TLS traits to a local JSON file (`scan_results.json`) and instantly load it back.
-- **Optional Nmap Engine Integration**: Extends native scanning functionalities by gracefully hooking into an existing system installation of [Nmap](https://nmap.org). NetSpecter acts as an independent orchestration wrapper to harness Nmap's OS fingerprinting and Vulnerability Scripting (`--script vuln`) without modifying Nmap's source code.
+- **Dashboard Filtering & Sorting**: Powerful client-side search indexing allows users to seamlessly filter discovered hosts by IP address, detected Operating System, or Hardware Vendor map. Easily sort the dashboard ascending/descending by numerical IP, Alphabetical vendor/OS, or by the mathematical total of open ports discovered to quickly bubble the most porous devices to the top of your review queue.
+- **Deep Scan All**: Efficiently queue automated deep port sweeps across your entire discovered subnet via a single click. Processes iteratively execute against every discovered device asynchronously while live-streaming results directly into the UI.
+- **Optional Nmap Engine Integration**: Extends native scanning functionalities by gracefully hooking into an existing system installation of [Nmap](https://nmap.org). NetSpecter acts as an independent orchestration wrapper to harness Nmap's OS fingerprinting and Vulnerability Scripting (`--script vuln`) without modifying Nmap's source code. You can target `-A` Deep Scans or singular open ports directly, streaming execution output live to the dashboard terminal.
+- **CVE Discovery & Badge Injection**: NetSpecter automatically parses incoming Nmap `vuln` terminal outputs asynchronously in real-time. Matches against CVE vulnerabilities automatically map to the host's `deepAudit` cache, injecting stylized vulnerability definitions and dynamic links into the Details panel while inherently incrementing that specific server's Security Posture Badge natively on the dashboard GUI.
+- **Nmap Scripting Engine (NSE) Explorer**: Contains a customized native OS file discovery module to dynamically locate and index your system's `scripts/` directory. Loads over `600+` `.nse` Lua payloads instantly into a searchable Autocomplete dropdown wrapper. Features dynamic color tags categorizing payloads by `safe`, `discovery`, `intrusive`, etc, allowing for granular `--script-args` payload executions directly against target servers with the raw TCP streams printing cleanly to the dashboard.
+- **Interactive Ncat Sockets**: Embeds an active raw TCP/UDP orchestration tab backed by Netcat (`ncat`) for raw, live network exploitation and connection testing directly in the GUI.
+
+---
+
+## 📖 Complete Documentation
+For a comprehensive breakdown of exactly how to use each feature, step-by-step UI breakdowns, and advanced Nmap exploitation techniques, please read the [Getting Started Guide](getting-started-guide.md).
 
 ---
 

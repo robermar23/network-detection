@@ -24,3 +24,5 @@ dist-ssr
 *.sw?
 
 *.scan_results.json
+dist/*
+release/*

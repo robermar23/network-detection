@@ -17,11 +17,55 @@ const detailsPanel = document.getElementById('details-panel');
 const btnCloseDetails = document.getElementById('btn-close-details');
 const detailsContent = document.getElementById('details-content');
 
+// View Toggles
+const btnViewGrid = document.getElementById('btn-view-grid');
+const btnViewList = document.getElementById('btn-view-list');
+const btnViewTable = document.getElementById('btn-view-table');
+
+let currentView = 'grid'; // 'grid', 'list', 'table'
+
 // State
 let isScanning = false;
 let hosts = []; // Store host objects
 
 // --- UI State Management ---
+
+function applyViewStyle() {
+  // Update toggle button active states
+  btnViewGrid.classList.toggle('active', currentView === 'grid');
+  btnViewList.classList.toggle('active', currentView === 'list');
+  btnViewTable.classList.toggle('active', currentView === 'table');
+
+  // Update main container class
+  hostGrid.className = `host-${currentView}`;
+  
+  // Conditionally add table headers if switching to table view
+  if (currentView === 'table' && hosts.length > 0) {
+     const hasHeader = hostGrid.querySelector('.host-table-header');
+     if (!hasHeader) {
+        const header = document.createElement('div');
+        header.className = 'host-table-header';
+        header.innerHTML = `
+          <div>IP Address</div>
+          <div>MAC Address</div>
+          <div>Hostname</div>
+          <div>Operating System</div>
+          <div>Vendor</div>
+          <div>Security Posture</div>
+          <div>Actions</div>
+        `;
+        hostGrid.insertBefore(header, hostGrid.firstChild);
+     }
+  } else {
+     // Remove table header for grid/list
+     const existingHeader = hostGrid.querySelector('.host-table-header');
+     if (existingHeader) existingHeader.remove();
+  }
+}
+
+btnViewGrid.addEventListener('click', () => { currentView = 'grid'; applyViewStyle(); });
+btnViewList.addEventListener('click', () => { currentView = 'list'; applyViewStyle(); });
+btnViewTable.addEventListener('click', () => { currentView = 'table'; applyViewStyle(); });
 
 async function initInterfaces() {
   if (!window.electronAPI) return;
@@ -243,19 +287,17 @@ function renderHostCard(host) {
 
   card.innerHTML = `
     <div class="status-indicator online"></div>
-    <div class="host-header" style="display:flex; justify-content: space-between; align-items: flex-start;">
-      <div>
-        <h3>${host.ip}</h3>
-        <p class="mac">${host.mac || 'Unknown MAC'}</p>
-      </div>
-      <div class="security-badge-container">
-         ${getSecurityBadgeHtml(host)}
-      </div>
+    <div class="host-header">
+      <h3>${host.ip}</h3>
+      <p class="mac">${host.mac || 'Unknown MAC'}</p>
     </div>
     <div class="host-body">
       <div class="info-row"><span class="label">Hostname:</span> <span class="value" title="${host.hostname}">${host.hostname || 'Unknown'}</span></div>
       <div class="info-row"><span class="label">OS:</span> <span class="value">${host.os || 'Unknown'}</span></div>
       <div class="info-row"><span class="label">Vendor:</span> <span class="value" title="${host.vendor}">${host.vendor || 'Unknown'}</span></div>
+      <div class="security-badge-container">
+         ${getSecurityBadgeHtml(host)}
+      </div>
     </div>
     <div class="host-footer" style="padding-top: 8px;">
       <button class="btn info full-width btn-view">View Details</button>
@@ -270,11 +312,21 @@ function renderHostCard(host) {
   if (btnView) {
     btnView.addEventListener('click', () => openDetailsPanel(host));
   }
+  
+  // Re-apply the view logic if table headers need initializing
+  if (typeof applyViewStyle === 'function') {
+     applyViewStyle();
+  }
 }
 
 function clearGrid() {
   hosts = [];
   hostGrid.innerHTML = '';
+  // Re-initialize headers if currently in table view
+  if (typeof applyViewStyle === 'function') {
+     applyViewStyle();
+  }
+  
   emptyState.classList.remove('hidden');
   detailsPanel.classList.remove('open');
   statusText.innerText = 'Ready to scan.';

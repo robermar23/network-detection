@@ -10,9 +10,10 @@ A modern, cross-platform desktop application built with Electron, Node.js, and V
 - **Advanced Hardware Identification**: Actively intercepts discovered MAC Addresses and resolves them via a local memory cache backed by a rate-limited, dynamic lookup to the live `macvendors.com` API to provide highly accurate Manufacturer readings (e.g., *Raspberry Pi Foundation*, *Sony Interactive Entertainment*, *Apple, Inc.*).
 - **Heuristic OS Fingerprinting**: Intelligently guesses the underlying Operating System (Windows, macOS, Linux, iOS, Android) by analyzing the hardware vendor combined with unique port signatures (e.g., `445` + `135` vs `22` + `548`).
 - **Forensic Deep Scans**: Click on any discovered host to trigger a visually engaging, cancellable Deep Scan. The backend chunks a raw socket sweep across all **65,535 TCP ports** to bypass operating system networking limits.
-- **Live Banner & Certificate Grabbing**: As the Deep Scan iterates, it automatically executes basic `HEAD / HTTP/1.0` and TLS Handshakes on open sockets to extract server software versions (e.g., `nginx`, `OpenSSH_8.2p1`), TLS Certificate Issuers, and Expiration Dates.
+- **Live Banner & Certificate Grabbing**: As the Deep Scan iterates, it automatically executes basic `GET / HTTP/1.0` and TLS Handshakes on open sockets to extract server software versions (e.g., `nginx`, `OpenSSH_8.2p1`), TLS Certificate Issuers, and Expiration Dates.
+- **Native Forensic Auditing**: Triggers active vulnerability probes (such as Anonymous FTP login attempts and `/.env` or `/.git/config` web fuzzing) against discovered services. Automatically calculates a surface-level Security Posture Score (🛡️ Protected, ⚠️ Warning, 🛑 Vulnerable) for every host on the subnet.
 - **Actionable Connect Bridges**: The UI intelligently parses discovered services and injects native workflow buttons. Instantly launch your OS's native SSH Terminal, RDP Client, or Default Web Browser directly against the target host with a single click.
-- **Session Management**: Export your entire network scan state to a local JSON file (`scan_results.json`) and instantly load it back into the dashboard at a later date for delta comparisons.
+- **Offline Session Persistence**: Export your entire network scan state—including all deep scan vulnerabilities, banners, and TLS traits—to a local JSON file (`scan_results.json`) and instantly load it back into the dashboard at a later date.
 
 ---
 

@@ -32,6 +32,17 @@
           <option value="">Loading interfaces...</option>
         </select>
         <button id="btn-refresh-interfaces" class="btn secondary icon-only" title="Refresh Interfaces">🔄</button>
+        <div class="divider"></div>
+        <div class="view-toggles"
+          style="display: flex; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 2px; border: 1px solid var(--border-glass);">
+          <button id="btn-view-grid" class="btn icon-only active" title="Grid View"
+            style="padding: 4px 8px; border-radius: 4px; box-shadow: none;">⏹️</button>
+          <button id="btn-view-list" class="btn icon-only" title="List View"
+            style="padding: 4px 8px; border-radius: 4px; box-shadow: none;">☰</button>
+          <button id="btn-view-table" class="btn icon-only" title="Table View"
+            style="padding: 4px 8px; border-radius: 4px; box-shadow: none;">🗄️</button>
+        </div>
+        <div class="divider"></div>
         <button id="btn-scan" class="btn primary" disabled>
           <span class="icon">🔍</span> Scan Network
         </button>

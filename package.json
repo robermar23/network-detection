@@ -14,5 +14,10 @@
     "cross-env": "^10.1.0",
     "electron": "^40.6.0",
     "vite": "^7.3.1"
+  },
+  "dependencies": {
+    "local-network-scanner": "^0.2.0",
+    "ping": "^1.0.0",
+    "split2": "^4.2.0"
   }
 }

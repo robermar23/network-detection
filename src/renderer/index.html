@@ -1,52 +1,59 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws://localhost:5173" />
-    <title>Network Detection Dashboard</title>
-    <!-- Google Fonts: Inter -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./style.css" />
-  </head>
-  <body>
-    <!-- Custom Titlebar Drag Overlay -->
-    <div class="titlebar-drag-region"></div>
 
-    <div class="app-container">
-      
-      <!-- Header / Controls -->
-      <header class="glass-panel main-header">
-        <div class="header-titles">
-          <h1>Network Observer</h1>
-          <p class="subtitle" id="status-text">Ready to scan.</p>
-        </div>
-        
-        <div class="control-group">
-          <button id="btn-scan" class="btn primary">
-            <span class="icon">🔍</span> Scan Network
-          </button>
-          <button id="btn-stop" class="btn danger" disabled>
-            <span class="icon">🛑</span> Stop
-          </button>
-          <div class="divider"></div>
-          <button id="btn-save" class="btn secondary">Save</button>
-          <button id="btn-load" class="btn secondary">Load</button>
-          <button id="btn-clear" class="btn secondary">Clear</button>
-          <div class="divider"></div>
-          <button id="btn-exit" class="btn danger-outline">Exit</button>
-        </div>
-      </header>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws://localhost:5173" />
+  <title>Network Detection Dashboard</title>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css" />
+</head>
 
-      <!-- Dashboard Grid -->
-      <main class="dashboard-scroll">
-        <div id="host-grid" class="host-grid">
-          <!-- Dynamically populated Host Cards will go here -->
-          
-          <!-- Example Card (Hidden by default, used as template structure conceptually) -->
-          <!--
+<body>
+  <!-- Custom Titlebar Drag Overlay -->
+  <div class="titlebar-drag-region"></div>
+
+  <div class="app-container">
+
+    <!-- Header / Controls -->
+    <header class="glass-panel main-header">
+      <div class="header-titles">
+        <h1>Network Observer</h1>
+        <p class="subtitle" id="status-text">Ready to scan.</p>
+      </div>
+
+      <div class="control-group">
+        <select id="interface-select" class="dropdown-select" disabled>
+          <option value="">Loading interfaces...</option>
+        </select>
+        <button id="btn-refresh-interfaces" class="btn secondary icon-only" title="Refresh Interfaces">🔄</button>
+        <button id="btn-scan" class="btn primary" disabled>
+          <span class="icon">🔍</span> Scan Network
+        </button>
+        <button id="btn-stop" class="btn danger" disabled>
+          <span class="icon">🛑</span> Stop
+        </button>
+        <div class="divider"></div>
+        <button id="btn-save" class="btn secondary">Save</button>
+        <button id="btn-load" class="btn secondary">Load</button>
+        <button id="btn-clear" class="btn secondary">Clear</button>
+        <div class="divider"></div>
+        <button id="btn-exit" class="btn danger-outline">Exit</button>
+      </div>
+    </header>
+
+    <!-- Dashboard Grid -->
+    <main class="dashboard-scroll">
+      <div id="host-grid" class="host-grid">
+        <!-- Dynamically populated Host Cards will go here -->
+
+        <!-- Example Card (Hidden by default, used as template structure conceptually) -->
+        <!--
           <div class="host-card glass-panel">
             <div class="status-indicator online"></div>
             <div class="host-header">
@@ -64,19 +71,31 @@
           </div>
           -->
 
-        </div>
-        
-        <!-- Empty State UI -->
-        <div id="empty-state" class="empty-state">
-          <div class="pulse-ring"></div>
-          <h2>No Hosts Detected</h2>
-          <p>Click "Scan Network" to begin discovering devices</p>
-        </div>
-      </main>
+      </div>
 
-    </div>
-    
-    <!-- Render Logic -->
-    <script type="module" src="./renderer.js"></script>
-  </body>
+      <!-- Empty State UI -->
+      <div id="empty-state" class="empty-state">
+        <div class="pulse-ring"></div>
+        <h2>No Hosts Detected</h2>
+        <p>Click "Scan Network" to begin discovering devices</p>
+      </div>
+    </main>
+
+    <!-- Host Details Side Panel -->
+    <aside id="details-panel" class="details-panel glass-panel">
+      <div class="details-header">
+        <h2>Host Details</h2>
+        <button id="btn-close-details" class="btn icon-only">✕</button>
+      </div>
+      <div class="details-content" id="details-content">
+        <!-- Content injected dynamically -->
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- Render Logic -->
+  <script type="module" src="./renderer.js"></script>
+</body>
+
 </html>

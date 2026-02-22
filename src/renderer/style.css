@@ -179,25 +179,37 @@ body {
   color: var(--text-main);
 }
 
-/* Details Panel */
+/* Details Panel (Sliding Sidebar) */
 .details-panel {
-  position: absolute;
-  top: 90px;
-  right: -400px; /* Hidden offscreen by default */
-  bottom: 24px;
-  width: 350px;
+  width: 0;
+  min-width: 0;
+  max-width: 800px;
   display: flex;
   flex-direction: column;
-  transition: right var(--transition-smooth), opacity var(--transition-smooth);
+  transition: width var(--transition-smooth), opacity var(--transition-smooth);
   opacity: 0;
-  pointer-events: none;
-  z-index: 100;
+  overflow: hidden;
+  border-left: 1px solid var(--border-glass);
 }
 
 .details-panel.open {
-  right: 24px;
+  width: 350px;
+  min-width: 300px;
   opacity: 1;
-  pointer-events: auto;
+}
+
+/* Resizer Handle */
+.resizer {
+  width: 8px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.2s;
+  z-index: 10;
+}
+
+.resizer:hover, .resizer.is-resizing {
+  background: var(--primary);
+  opacity: 0.5;
 }
 
 .details-header {

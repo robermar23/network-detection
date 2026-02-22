@@ -23,5 +23,13 @@ export const IPC_CHANNELS = {
   
   DEEP_SCAN_RESULT: 'deep-scan-result',
   DEEP_SCAN_PROGRESS: 'deep-scan-progress',
-  DEEP_SCAN_COMPLETE: 'deep-scan-complete'
+  DEEP_SCAN_COMPLETE: 'deep-scan-complete',
+
+  // Nmap Channels
+  CHECK_NMAP: 'check-nmap',
+  RUN_NMAP_SCAN: 'run-nmap-scan',
+  CANCEL_NMAP_SCAN: 'cancel-nmap-scan',
+  NMAP_SCAN_RESULT: 'nmap-scan-result',
+  NMAP_SCAN_COMPLETE: 'nmap-scan-complete',
+  NMAP_SCAN_ERROR: 'nmap-scan-error'
 };

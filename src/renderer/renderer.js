@@ -36,6 +36,19 @@ let sortDirection = 'asc'; // 'asc', 'desc'
 // State
 let isScanning = false;
 let hosts = []; // Store host objects
+let isNmapInstalled = false;
+
+// Check Nmap Installation on load
+window.electronAPI.checkNmap().then(installed => {
+  isNmapInstalled = installed;
+  if (!installed) {
+    document.getElementById('nmap-install-banner').style.display = 'block';
+  }
+});
+
+document.getElementById('btn-close-nmap-banner').addEventListener('click', () => {
+  document.getElementById('nmap-install-banner').style.display = 'none';
+});
 
 // --- UI State Management ---
 
@@ -196,28 +209,148 @@ function openDetailsPanel(host) {
       <span class="label" style="display:block; margin-bottom: 12px; font-weight: 500; font-size: 14px; color: white;">Open Ports</span>
       <div>
         ${(host.ports && host.ports.length > 0) 
-          ? host.ports.map(p => `<span class="port-item">${p}</span>`).join('') 
+          ? host.ports.map(p => `<span class="port-item" data-port="${p}" style="cursor: pointer;" title="Click to Nmap Scan Port ${p}">${p}</span>`).join('') 
           : '<span class="value">No common open ports detected.</span>'}
       </div>
     </div>
     
-    <div class="deep-scan-container">
-      <button id="btn-run-deep-scan" class="btn warning full-width" data-ip="${host.ip}">
-        <span class="icon">☢️</span> ${host.deepAudit ? 'Re-Run Deep Scan' : 'Run Deep Scan'}
-      </button>
+    <div class="deep-scan-container" style="margin-top: 10px;">
+      <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 4px; border: 1px solid var(--border-glass); justify-content: center;">
+        <span style="font-size: 12px; color: var(--text-muted); margin-right: 4px;">Engine:</span>
+        <button id="btn-engine-native" class="btn icon-only active" title="Native Scanner" style="padding: 4px 12px; border-radius: 4px; font-size: 12px; height: 24px; box-shadow: none;">Native</button>
+        <button id="btn-engine-nmap" class="btn icon-only" title="Nmap Scanner" style="padding: 4px 12px; border-radius: 4px; font-size: 12px; height: 24px; box-shadow: none;">Nmap</button>
+      </div>
+
+      <!-- Native Actions -->
+      <div id="native-actions">
+        <button id="btn-run-deep-scan" class="btn warning full-width" data-ip="${host.ip}">
+          <span class="icon">☢️</span> ${host.deepAudit && host.deepAudit.history.length > 0 ? 'Re-Run Deep Scan' : 'Run Deep Scan'}
+        </button>
+      </div>
+
+      <!-- Nmap Actions -->
+      <div id="nmap-actions" style="display: none; flex-direction: column; gap: 8px;">
+        <button id="btn-nmap-deep" class="btn warning full-width" data-ip="${host.ip}" title="Aggressive scan all 65k ports">
+          <span class="icon">☢️</span> Nmap Deep Scan (All Ports)
+        </button>
+        <button id="btn-nmap-host" class="btn info full-width" data-ip="${host.ip}" title="Standard host scan">
+          <span class="icon">🖥️</span> Nmap Standard Host Scan
+        </button>
+        <button id="btn-nmap-vuln" class="btn danger full-width" data-ip="${host.ip}" title="Run Nmap vulnerability scripts">
+          <span class="icon">🛡️</span> Nmap Vuln Scan (Scripts)
+        </button>
+      </div>
+
+      <!-- Results Containers -->
       <div id="deep-scan-results" class="deep-scan-results">
         ${savedDeepScanHtml}
+      </div>
+
+      <div id="nmap-scan-results" style="display: none; margin-top: 12px; flex-direction: column; gap: 8px;">
+        ${getSavedNmapHtml(host)}
       </div>
     </div>
   `;
   detailsPanel.classList.add('open');
+  document.getElementById('sidebar-resizer').style.display = 'block';
 
-  // Attach Deep Scan listener
+  // Attach Listeners
+  attachDetailsPanelListeners(host);
+}
+
+btnCloseDetails.addEventListener('click', () => {
+  detailsPanel.classList.remove('open');
+  document.getElementById('sidebar-resizer').style.display = 'none';
+  detailsPanel.style.width = ''; // Reset custom drag width
+});
+
+// --- Sidebar Resizer Logic ---
+const resizer = document.getElementById('sidebar-resizer');
+let isResizing = false;
+let startX;
+let startWidth;
+
+resizer.addEventListener('mousedown', (e) => {
+  isResizing = true;
+  startX = e.clientX;
+  startWidth = parseInt(document.defaultView.getComputedStyle(detailsPanel).width, 10);
+  resizer.classList.add('is-resizing');
+  document.body.style.cursor = 'col-resize';
+  // Prevent highlighting text while dragging
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!isResizing) return;
+  // Calculate new width (mouse moving left increases width because panel is on right)
+  const newWidth = startWidth - (e.clientX - startX);
+  
+  // Enforce bounds
+  if (newWidth > 300 && newWidth < Math.min(800, window.innerWidth - 100)) {
+    detailsPanel.style.width = `${newWidth}px`;
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  if (isResizing) {
+    isResizing = false;
+    resizer.classList.remove('is-resizing');
+    document.body.style.cursor = '';
+  }
+});
+
+function getSavedNmapHtml(host) {
+  if (!host.nmapData) return '';
+  let html = '';
+  ['deep', 'host', 'vuln'].forEach(type => {
+    if (host.nmapData[type]) {
+      const safeText = host.nmapData[type].replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      html += `<div class="ds-record"><div class="ds-service">Saved Nmap ${type.toUpperCase()} Scan</div><div class="ds-banner">${safeText}</div></div>`;
+    }
+  });
+  if (host.nmapData.ports) {
+    Object.keys(host.nmapData.ports).forEach(port => {
+      const safeText = host.nmapData.ports[port].replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      html += `<div class="ds-record"><div class="ds-service">Saved Nmap Port Scan (Port ${port})</div><div class="ds-banner">${safeText}</div></div>`;
+    });
+  }
+  return html;
+}
+
+function attachDetailsPanelListeners(host) {
   const btnRunDeepScan = document.getElementById('btn-run-deep-scan');
   const dsResults = document.getElementById('deep-scan-results');
+  const btnEngineNative = document.getElementById('btn-engine-native');
+  const btnEngineNmap = document.getElementById('btn-engine-nmap');
+  const nativeActions = document.getElementById('native-actions');
+  const nmapActions = document.getElementById('nmap-actions');
+  const nmapScanResults = document.getElementById('nmap-scan-results');
 
+  // Engine toggles
+  btnEngineNative.addEventListener('click', () => {
+    btnEngineNative.classList.add('active');
+    btnEngineNmap.classList.remove('active');
+    nativeActions.style.display = 'block';
+    nmapActions.style.display = 'none';
+    dsResults.style.display = 'flex';
+    nmapScanResults.style.display = 'none';
+  });
+
+  btnEngineNmap.addEventListener('click', () => {
+    if (!isNmapInstalled) {
+       alert('Nmap is not installed. Please follow the download instructions at the top.');
+       return;
+    }
+    btnEngineNmap.classList.add('active');
+    btnEngineNative.classList.remove('active');
+    nmapActions.style.display = 'flex';
+    nativeActions.style.display = 'none';
+    nmapScanResults.style.display = 'flex';
+    dsResults.style.display = 'none';
+  });
+
+  // Native Deep Scan Logic
   btnRunDeepScan.addEventListener('click', async () => {
-    // If it's already scanning and the user clicks it again, trigger cancel state
     if (btnRunDeepScan.getAttribute('data-scanning') === 'true') {
       window.electronAPI.cancelDeepScan(host.ip);
       btnRunDeepScan.innerHTML = `<span class="icon">🛑</span> Cancelling...`;
@@ -226,18 +359,68 @@ function openDetailsPanel(host) {
     }
 
     btnRunDeepScan.setAttribute('data-scanning', 'true');
-    btnRunDeepScan.classList.add('pulsing', 'danger-pulsing'); // Use danger pulsing for explicit cancel visibility
+    btnRunDeepScan.classList.add('pulsing', 'danger-pulsing');
     btnRunDeepScan.classList.remove('warning');
     btnRunDeepScan.innerHTML = `<span class="icon">🛑</span> Cancel Scan...`;
-    dsResults.innerHTML = ''; // clear previous
+    dsResults.innerHTML = ''; 
     
-    // Reset Data State
     const hostIdx = hosts.findIndex(h => h.ip === host.ip);
     if (hostIdx >= 0) {
       hosts[hostIdx].deepAudit = { history: [], vulnerabilities: 0, warnings: 0 };
     }
-    
     await window.electronAPI.runDeepScan(host.ip);
+  });
+
+  // Nmap Buttons Logic
+  const handleNmapScan = async (btnId, type, label) => {
+    const btn = document.getElementById(btnId);
+    if (btn.getAttribute('data-scanning') === 'true') {
+      window.electronAPI.cancelNmapScan(type === 'port' ? `${host.ip}:${btn.getAttribute('data-port')}` : host.ip);
+      btn.innerHTML = `<span class="icon">🛑</span> Cancelling...`;
+      btn.setAttribute('data-scanning', 'cancelling');
+      return;
+    }
+
+    btn.setAttribute('data-scanning', 'true');
+    btn.classList.add('pulsing', 'danger-pulsing');
+    btn.innerHTML = `<span class="icon">🛑</span> Cancel ${label}...`;
+
+    // Construct clear blocks block
+    let newBlock = document.createElement('div');
+    newBlock.className = 'ds-record';
+    newBlock.id = `nmap-live-${type}`;
+    newBlock.innerHTML = `<div class="ds-service">Live Nmap ${label}</div><div class="ds-banner" id="nmap-live-banner-${type}">Initializing...</div>`;
+    nmapScanResults.prepend(newBlock);
+
+    await window.electronAPI.runNmapScan(type, type === 'port' ? `${host.ip}:${btn.getAttribute('data-port')}` : host.ip);
+  };
+
+  document.getElementById('btn-nmap-deep').addEventListener('click', () => handleNmapScan('btn-nmap-deep', 'deep', 'Deep Scan'));
+  document.getElementById('btn-nmap-host').addEventListener('click', () => handleNmapScan('btn-nmap-host', 'host', 'Host Scan'));
+  document.getElementById('btn-nmap-vuln').addEventListener('click', () => handleNmapScan('btn-nmap-vuln', 'vuln', 'Vuln Scan'));
+
+  // Clickable ports logic
+  document.querySelectorAll('.port-item').forEach(el => {
+    el.addEventListener('click', () => {
+       if (!isNmapInstalled) return alert('Nmap not installed');
+       const port = el.getAttribute('data-port');
+       
+       // Programmatically switch to Nmap
+       btnEngineNmap.click();
+       
+       const btnId = `btn-nmap-port-${port}`;
+       // If a temporary button doesn't exist, create it
+       if (!document.getElementById(btnId)) {
+          const newBtn = document.createElement('button');
+          newBtn.id = btnId;
+          newBtn.className = 'btn warning full-width';
+          newBtn.setAttribute('data-port', port);
+          newBtn.innerHTML = `<span class="icon">🎯</span> Nmap specific port: ${port}`;
+          newBtn.addEventListener('click', () => handleNmapScan(btnId, 'port', `Port ${port} Scan`));
+          nmapActions.appendChild(newBtn);
+       }
+       document.getElementById(btnId).click();
+    });
   });
 }
 
@@ -787,6 +970,143 @@ if (window.electronAPI) {
        if (badgeContainer) {
          badgeContainer.innerHTML = getSecurityBadgeHtml(host);
        }
+    }
+  });
+
+  // Nmap Event Receivers
+  window.electronAPI.onNmapScanResult && window.electronAPI.onNmapScanResult((data) => {
+    let type = data.type;
+    const chunk = data.chunk;
+    
+    // Parse Progress Stats
+    // Example: "Stats: 0:00:03 elapsed; 0 hosts completed (1 up), 1 undergoing SYN Stealth Scan\nSYN Stealth Scan Timing: About 15.38% done; ETC: 14:10 (0:00:17 remaining)"
+    const timingMatch = chunk.match(/Timing:\s*About\s*([\d.]+)%\s*done/i);
+    if (timingMatch) {
+       const percent = parseFloat(timingMatch[1]).toFixed(1);
+       const target = data.target;
+       const port = type === 'port' ? target.split(':')[1] : null;
+       const btnIds = { 'deep': 'btn-nmap-deep', 'host': 'btn-nmap-host', 'vuln': 'btn-nmap-vuln', 'port': `btn-nmap-port-${port}` };
+       const btn = document.getElementById(btnIds[type]);
+       
+       if (btn && btn.getAttribute('data-scanning') === 'true') {
+         // Determine original label
+         let label = 'Scan';
+         if (type === 'deep') label = 'Deep Scan';
+         if (type === 'host') label = 'Host Scan';
+         if (type === 'vuln') label = 'Vuln Scan';
+         if (type === 'port') label = `Port ${port} Scan`;
+         
+         btn.innerHTML = `<span class="icon">🛑</span> Cancel ${label}... (${percent}%)`;
+       }
+    }
+    
+    const bannerBlock = document.getElementById(`nmap-live-banner-${type}`);
+    if (bannerBlock) {
+      if (bannerBlock.innerText === 'Initializing...') bannerBlock.innerText = '';
+      const safeChunk = chunk.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      bannerBlock.innerHTML += safeChunk;
+    }
+  });
+
+  window.electronAPI.onNmapScanComplete && window.electronAPI.onNmapScanComplete((data) => {
+    const target = data.target;
+    const type = data.type;
+    const ip = type === 'port' ? target.split(':')[0] : target;
+    const port = type === 'port' ? target.split(':')[1] : null;
+
+    // Save state
+    const hostIdx = hosts.findIndex(h => h.ip === ip);
+    if (hostIdx >= 0) {
+      if (!hosts[hostIdx].nmapData) hosts[hostIdx].nmapData = { ports: {} };
+      if (type === 'port') {
+         hosts[hostIdx].nmapData.ports[port] = data.fullOutput;
+      } else {
+         hosts[hostIdx].nmapData[type] = data.fullOutput;
+      }
+
+      // Metadata Extraction for Dashboard
+      let metadataChanged = false;
+      const fullOutput = data.fullOutput;
+
+      // Extract OS
+      if (type === 'host' || type === 'deep') {
+        const osMatch1 = fullOutput.match(/OS details:\s*(.*?)(?:\n|$)/);
+        const osMatch2 = fullOutput.match(/Service Info:.*?OS:\s*([^;]+);/);
+        const osName = (osMatch1 && osMatch1[1]) || (osMatch2 && osMatch2[1]);
+        if (osName && (!hosts[hostIdx].os || hosts[hostIdx].os === 'Unknown' || hosts[hostIdx].os === 'Unknown OS')) {
+           hosts[hostIdx].os = `(Nmap) ${osName.substring(0, 30)}`;
+           metadataChanged = true;
+        }
+
+        // Extract Open Ports to bump Security Badge
+        const portMatches = [...fullOutput.matchAll(/(\d+)\/tcp\s+open\s+/g)];
+        if (portMatches.length > 0) {
+           const foundPorts = portMatches.map(m => parseInt(m[1], 10));
+           const existingSet = new Set(hosts[hostIdx].ports || []);
+           let newPortsAdded = false;
+           foundPorts.forEach(fp => {
+             if (!existingSet.has(fp)) {
+                existingSet.add(fp);
+                newPortsAdded = true;
+             }
+           });
+           if (newPortsAdded) {
+              hosts[hostIdx].ports = Array.from(existingSet).sort((a,b) => a-b);
+              metadataChanged = true;
+           }
+        }
+      }
+
+      if (metadataChanged) {
+        debouncedRenderAllHosts();
+        
+        // Also cleanly update the specific opened Details panel port map if it's the active one
+        const btnRunDeepScan = document.getElementById('btn-run-deep-scan');
+        if (btnRunDeepScan && btnRunDeepScan.getAttribute('data-ip') === ip) {
+           // Sneaky UI refresh - if we changed data beneath an open panel, ideally refresh the entire panel.
+           // However keeping state stable is preferable. A full UI redesign might be needed, but for now
+           // just letting the user see the badges on the main view is enough per the spec "displayed in the main application dashboard".
+        }
+      }
+    }
+
+    // Reset UI buttons
+    const btnIds = {
+      'deep': 'btn-nmap-deep',
+      'host': 'btn-nmap-host',
+      'vuln': 'btn-nmap-vuln',
+      'port': `btn-nmap-port-${port}`
+    };
+    
+    const btn = document.getElementById(btnIds[type]);
+    if (btn) {
+      const wasCancelled = btn.getAttribute('data-scanning') === 'cancelling';
+      btn.classList.remove('pulsing', 'danger-pulsing');
+      btn.removeAttribute('data-scanning');
+      btn.innerHTML = wasCancelled ? `<span class="icon">⚠️</span> Scan Cancelled` : `<span class="icon">✅</span> Scan Complete`;
+
+      if (wasCancelled) {
+        const bannerBlock = document.getElementById(`nmap-live-banner-${type}`);
+        if (bannerBlock) bannerBlock.innerHTML += '\n\n[SCAN CANCELLED]';
+      }
+    }
+  });
+
+  window.electronAPI.onNmapScanError && window.electronAPI.onNmapScanError((data) => {
+    const type = data.type;
+    const bannerBlock = document.getElementById(`nmap-live-banner-${type}`);
+    if (bannerBlock) {
+       bannerBlock.innerHTML += `\n\n[ERROR]: ${data.error}`;
+    }
+    
+    const target = data.target;
+    const port = type === 'port' ? target.split(':')[1] : null;
+    const btnIds = { 'deep': 'btn-nmap-deep', 'host': 'btn-nmap-host', 'vuln': 'btn-nmap-vuln', 'port': `btn-nmap-port-${port}` };
+    const btn = document.getElementById(btnIds[type]);
+    if (btn) {
+      btn.classList.remove('pulsing', 'danger-pulsing');
+      btn.removeAttribute('data-scanning');
+      btn.innerHTML = `<span class="icon">❌</span> Scan Failed`;
     }
   });
 }

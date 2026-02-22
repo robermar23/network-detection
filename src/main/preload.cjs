@@ -20,7 +20,14 @@ var IPC_CHANNELS = {
   SCAN_ERROR: "scan-error",
   DEEP_SCAN_RESULT: "deep-scan-result",
   DEEP_SCAN_PROGRESS: "deep-scan-progress",
-  DEEP_SCAN_COMPLETE: "deep-scan-complete"
+  DEEP_SCAN_COMPLETE: "deep-scan-complete",
+  // Nmap Channels
+  CHECK_NMAP: "check-nmap",
+  RUN_NMAP_SCAN: "run-nmap-scan",
+  CANCEL_NMAP_SCAN: "cancel-nmap-scan",
+  NMAP_SCAN_RESULT: "nmap-scan-result",
+  NMAP_SCAN_COMPLETE: "nmap-scan-complete",
+  NMAP_SCAN_ERROR: "nmap-scan-error"
 };
 
 // src/main/preload.js
@@ -36,6 +43,10 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
   runDeepScan: (ip) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.RUN_DEEP_SCAN, ip),
   cancelDeepScan: (ip) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.CANCEL_DEEP_SCAN, ip),
   openExternalAction: (payload) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.OPEN_EXTERNAL_ACTION, payload),
+  // Nmap Triggers
+  checkNmap: () => import_electron.ipcRenderer.invoke(IPC_CHANNELS.CHECK_NMAP),
+  runNmapScan: (type, target) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.RUN_NMAP_SCAN, { type, target }),
+  cancelNmapScan: (target) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.CANCEL_NMAP_SCAN, target),
   // Event Listeners for streams
   onHostFound: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.HOST_FOUND, (_event, value) => callback(value)),
   onScanComplete: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.SCAN_COMPLETE, (_event, value) => callback(value)),
@@ -44,6 +55,10 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
   onDeepScanResult: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.DEEP_SCAN_RESULT, (_event, value) => callback(value)),
   onDeepScanProgress: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.DEEP_SCAN_PROGRESS, (_event, value) => callback(value)),
   onDeepScanComplete: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.DEEP_SCAN_COMPLETE, (_event, value) => callback(value)),
+  // Nmap Event Streams
+  onNmapScanResult: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.NMAP_SCAN_RESULT, (_event, value) => callback(value)),
+  onNmapScanComplete: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.NMAP_SCAN_COMPLETE, (_event, value) => callback(value)),
+  onNmapScanError: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.NMAP_SCAN_ERROR, (_event, value) => callback(value)),
   // Cleanup listeners
   removeListeners: () => {
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.HOST_FOUND);
@@ -52,5 +67,8 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.DEEP_SCAN_RESULT);
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.DEEP_SCAN_PROGRESS);
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.DEEP_SCAN_COMPLETE);
+    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.NMAP_SCAN_RESULT);
+    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.NMAP_SCAN_COMPLETE);
+    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.NMAP_SCAN_ERROR);
   }
 });

@@ -20,6 +20,18 @@
 
   <div class="app-container">
 
+    <!-- Nmap Install Banner (Hidden by default) -->
+    <div id="nmap-install-banner" class="nmap-banner"
+      style="display: none; position: relative; background: rgba(235, 177, 52, 0.9); color: #111; padding: 12px 20px; font-weight: 500; font-size: 14px; text-align: center; border-bottom: 1px solid #c99318;">
+      ⚠️ Nmap is not installed or not in your system PATH.
+      <a href="https://nmap.org/download.html" target="_blank"
+        style="color: #000; text-decoration: underline; font-weight: 600; margin-left: 10px;">Download Nmap Here</a>
+      <span style="margin-left: 10px; opacity: 0.8; font-size: 12px;">(Restart NetSpecter after installing)</span>
+      <button id="btn-close-nmap-banner" class="btn icon-only"
+        style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #000; background: rgba(0,0,0,0.1); padding: 4px;"
+        title="Dismiss">✕</button>
+    </div>
+
     <!-- Header / Controls -->
     <header class="glass-panel main-header" style="flex-direction: column; gap: 16px; align-items: stretch;">
       <div class="header-top" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
@@ -88,13 +100,15 @@
       </div>
     </header>
 
-    <!-- Dashboard Grid -->
-    <main class="dashboard-scroll">
-      <div id="host-grid" class="host-grid">
-        <!-- Dynamically populated Host Cards will go here -->
+    <!-- Split View Container -->
+    <div class="split-view-container" style="display: flex; flex-grow: 1; overflow: hidden; gap: 0;">
+      <!-- Dashboard Grid -->
+      <main class="dashboard-scroll" style="flex-grow: 1;">
+        <div id="host-grid" class="host-grid">
+          <!-- Dynamically populated Host Cards will go here -->
 
-        <!-- Example Card (Hidden by default, used as template structure conceptually) -->
-        <!--
+          <!-- Example Card (Hidden by default, used as template structure conceptually) -->
+          <!--
           <div class="host-card glass-panel">
             <div class="status-indicator online"></div>
             <div class="host-header">
@@ -112,26 +126,30 @@
           </div>
           -->
 
-      </div>
+        </div>
 
-      <!-- Empty State UI -->
-      <div id="empty-state" class="empty-state">
-        <div class="pulse-ring"></div>
-        <h2>No Hosts Detected</h2>
-        <p>Click "Scan Network" to begin discovering devices</p>
-      </div>
-    </main>
+        <!-- Empty State UI -->
+        <div id="empty-state" class="empty-state">
+          <div class="pulse-ring"></div>
+          <h2>No Hosts Detected</h2>
+          <p>Click "Scan Network" to begin discovering devices</p>
+        </div>
+      </main>
 
-    <!-- Host Details Side Panel -->
-    <aside id="details-panel" class="details-panel glass-panel">
-      <div class="details-header">
-        <h2>Host Details</h2>
-        <button id="btn-close-details" class="btn icon-only">✕</button>
-      </div>
-      <div class="details-content" id="details-content">
-        <!-- Content injected dynamically -->
-      </div>
-    </aside>
+      <!-- Resizer Handle -->
+      <div id="sidebar-resizer" class="resizer" style="display: none;"></div>
+
+      <!-- Host Details Side Panel -->
+      <aside id="details-panel" class="details-panel glass-panel">
+        <div class="details-header">
+          <h2>Host Details</h2>
+          <button id="btn-close-details" class="btn icon-only">✕</button>
+        </div>
+        <div class="details-content" id="details-content">
+          <!-- Content injected dynamically -->
+        </div>
+      </aside>
+    </div> <!-- End Split View Container -->
 
   </div>
 

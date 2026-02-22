@@ -13,7 +13,8 @@ A modern, cross-platform desktop application built with Electron, Node.js, and V
 - **Live Banner & Certificate Grabbing**: As the Deep Scan iterates, it automatically executes basic `GET / HTTP/1.0` and TLS Handshakes on open sockets to extract server software versions (e.g., `nginx`, `OpenSSH_8.2p1`), TLS Certificate Issuers, and Expiration Dates.
 - **Native Forensic Auditing**: Triggers active vulnerability probes (such as Anonymous FTP login attempts and `/.env` or `/.git/config` web fuzzing) against discovered services. Automatically calculates a surface-level Security Posture Score (🛡️ Protected, ⚠️ Warning, 🛑 Vulnerable) for every host on the subnet.
 - **Actionable Connect Bridges**: The UI intelligently parses discovered services and injects native workflow buttons. Instantly launch your OS's native SSH Terminal, RDP Client, or Default Web Browser directly against the target host with a single click.
-- **Offline Session Persistence**: Export your entire network scan state—including all deep scan vulnerabilities, banners, and TLS traits—to a local JSON file (`scan_results.json`) and instantly load it back into the dashboard at a later date.
+- **Data Persistence**: Offline session persistence allows saving all network scan states, deep scan vulnerabilities, banners, and TLS traits to a local JSON file (`scan_results.json`) and instantly load it back.
+- **Optional Nmap Engine Integration**: Extends native scanning functionalities by gracefully hooking into an existing system installation of [Nmap](https://nmap.org). NetSpecter acts as an independent orchestration wrapper to harness Nmap's OS fingerprinting and Vulnerability Scripting (`--script vuln`) without modifying Nmap's source code.
 
 ---
 
@@ -81,3 +82,6 @@ The codebase is strictly separated to adhere to Electron's security model:
 ## License
 
 This project is open-sourced software licensed under the [MIT license](LICENSE).
+
+### Third-Party Software Disclosures
+- **Nmap**: This application can optionally interact with [Nmap](https://nmap.org) if the user has independently installed it on their system. NetSpecter is merely a graphical front-end that executes Nmap via standard command-line interfaces. NetSpecter does **not** distribute, incorporate, or statically link Nmap's source code, binary executables, or libraries. Nmap is a registered trademark of Insecure.Com LLC and is distributed under its own proprietary license (NPSL). NetSpecter is not affiliated with, endorsed by, or sponsored by the Nmap Project.

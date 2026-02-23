@@ -52,7 +52,10 @@
       ]
     },
     "publish": [
-      "github"
+      {
+        "provider": "github",
+        "releaseType": "release"
+      }
     ]
   },
   "devDependencies": {

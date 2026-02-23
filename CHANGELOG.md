@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1](https://github.com/robermar23/netspectre/compare/v1.2.0...v1.2.1) (2026-02-23)
+
+
+### Bug Fixes
+
+* add image log ([9154b64](https://github.com/robermar23/netspectre/commit/9154b6454aa85e3c53456ac63ea77da5f9a2b28e))
+* add image log ([187a9f5](https://github.com/robermar23/netspectre/commit/187a9f5970990af08fdbf8b01b0369fe6ab45a3d))
+
 ## [1.2.0](https://github.com/robermar23/netspectre/compare/v1.1.1...v1.2.0) (2026-02-23)
 
 

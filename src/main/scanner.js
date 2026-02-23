@@ -3,7 +3,8 @@ import net from 'net';
 import ping from 'ping';
 import os from 'os';
 import https from 'https';
-import { vendorMap, COMMON_PORTS } from '../shared/networkConstants.js';
+import { promises as dnsPromises } from 'dns';
+import { vendorMap, COMMON_PORTS } from '#shared/networkConstants.js';
 
 let scanActive = false;
 
@@ -269,7 +270,7 @@ export async function startNetworkScan(subnet, onHostFoundCallback, onCompleteCa
 
     let hostname = 'Unknown';
     try {
-      const { hostnames } = await os.promises?.dns?.reverse(ip) || require('dns').promises.reverse(ip);
+      const { hostnames } = await os.promises?.dns?.reverse(ip) || await dnsPromises.reverse(ip);
       if (hostnames && hostnames.length > 0) hostname = hostnames[0];
     } catch(e) {} // DNS Reverse failure is common/expected
 

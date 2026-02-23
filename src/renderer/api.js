@@ -1,0 +1,17 @@
+export const api = {
+  checkNmap: async () => window.electronAPI.checkNmap(),
+  getNmapScripts: async () => window.electronAPI.getNmapScripts(),
+  getInterfaces: async () => window.electronAPI.getInterfaces(),
+  scanNetwork: async (subnet) => window.electronAPI.scanNetwork(subnet),
+  stopScan: async () => window.electronAPI.stopScan(),
+  openExternalAction: async (payload) => window.electronAPI.openExternalAction(payload),
+  runDeepScan: async (ip) => window.electronAPI.runDeepScan(ip),
+  cancelDeepScan: async (ip) => window.electronAPI.cancelDeepScan(ip),
+  runNmapScan: async (type, targetObj) => window.electronAPI.runNmapScan(type, targetObj),
+  cancelNmapScan: async (target) => window.electronAPI.cancelNmapScan(target),
+  runNcat: async (payloadObj) => window.electronAPI.runNcat(payloadObj),
+  saveResults: async (results) => window.electronAPI.saveResults(results),
+  loadResults: async () => window.electronAPI.loadResults(),
+  clearResults: async () => window.electronAPI.clearResults(),
+  exitApp: () => window.electronAPI.exitApp()
+};

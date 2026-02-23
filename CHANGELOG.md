@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/robermar23/netspectre/compare/v1.3.0...v1.3.1) (2026-02-23)
+
+
+### Bug Fixes
+
+* restore bad functionality ([5ddc8ae](https://github.com/robermar23/netspectre/commit/5ddc8aeb031a65daf5074006728b5528ccf2be55))
+
 ## [1.3.0](https://github.com/robermar23/netspectre/compare/v1.2.1...v1.3.0) (2026-02-23)
 
 

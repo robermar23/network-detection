@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/robermar23/network-detection/compare/v1.0.1...v1.0.2) (2026-02-23)
+
+
+### Bug Fixes
+
+* make sure we set releaeType so assets are actually published ([cc1a3c0](https://github.com/robermar23/network-detection/commit/cc1a3c06e3f72333c2b40fe7fefa2397acb4bcaa))
+
 ## [1.0.1](https://github.com/robermar23/network-detection/compare/v1.0.0...v1.0.1) (2026-02-23)
 
 

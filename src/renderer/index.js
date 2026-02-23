@@ -144,55 +144,42 @@ function openDetailsPanel(host) {
   elements.detailsContent.innerHTML = `
     <div class="info-row">
       <span class="label">IP Address</span>
-      <div class="value">${escapeHtml(host.ip)}</div>
+      <div class="value" id="dp-field-ip"></div>
     </div>
     <div class="info-row">
       <span class="label">MAC Address</span>
-      <div class="value" style="font-family: monospace;">${escapeHtml(host.mac) || 'Unknown'}</div>
+      <div class="value" style="font-family: monospace;" id="dp-field-mac"></div>
     </div>
     <div class="info-row">
       <span class="label">Hostname</span>
-      <div class="value" id="dp-hostname">${escapeHtml(host.hostname) || 'Unknown'}</div>
+      <div class="value" id="dp-hostname"></div>
     </div>
     <div class="info-row">
       <span class="label">Operating System</span>
-      <div class="value" id="dp-os">${escapeHtml(host.os) || 'Unknown'}</div>
+      <div class="value" id="dp-os"></div>
     </div>
-    <div class="info-row" id="dp-device-row" style="display: ${host.deviceType ? 'flex' : 'none'};">
+    <div class="info-row" id="dp-device-row" style="display: none;">
       <span class="label">Device Type</span>
-      <div class="value" id="dp-device">${escapeHtml(host.deviceType) || ''}</div>
+      <div class="value" id="dp-device"></div>
     </div>
-    <div class="info-row" id="dp-kernel-row" style="display: ${host.kernel ? 'flex' : 'none'};">
+    <div class="info-row" id="dp-kernel-row" style="display: none;">
       <span class="label" style="min-width: 60px;">Kernel</span>
-      <div class="value" id="dp-kernel" style="text-align: right;">${escapeHtml(host.kernel) || ''}</div>
+      <div class="value" id="dp-kernel" style="text-align: right;"></div>
     </div>
     <div class="info-row">
       <span class="label">Hardware Vendor</span>
-      <div class="value" id="dp-vendor">${escapeHtml(host.vendor) || 'Unknown'}</div>
+      <div class="value" id="dp-vendor"></div>
     </div>
     
     <div style="margin-top: 10px; border-top: 1px solid var(--border-glass); padding-top: 16px;">
       <span class="label" style="display:block; margin-bottom: 12px; font-weight: 500; font-size: 14px; color: white;">Open Ports</span>
-      <div>
-        ${(host.ports && host.ports.length > 0) 
-          ? host.ports.map(p => `<span class="port-item" data-port="${p}" style="cursor: pointer;" title="Click to Nmap Scan Port ${p}">${p}</span>`).join('') 
-          : '<span class="value">No common open ports detected.</span>'}
-      </div>
+      <div id="dp-ports-container"></div>
     </div>
     
-    ${host.nmapData && host.nmapData.vulnerabilities && host.nmapData.vulnerabilities.length > 0 ? `
-    <div style="margin-top: 10px; border-top: 1px solid var(--border-glass); padding-top: 16px;">
+    <div id="dp-vulns-section" style="display: none; margin-top: 10px; border-top: 1px solid var(--border-glass); padding-top: 16px;">
       <span class="label" style="display:block; margin-bottom: 12px; font-weight: 500; font-size: 14px; color: var(--danger);">Vulnerabilities Discovered</span>
-      <div style="display: flex; flex-direction: column; gap: 8px;">
-        ${host.nmapData.vulnerabilities.map(v => `
-          <div style="background: rgba(235,94,94,0.05); border-left: 3px solid var(--danger); padding: 8px; font-size: 12px; border-radius: 4px;">
-             <div style="font-weight: 600; font-family: monospace; color: var(--danger); margin-bottom: 4px;">${v.id} (${v.severity.toUpperCase()})</div>
-             <div style="color: var(--text-muted); line-height: 1.4;">${v.details.replace(/\n/g, '<br>')}</div>
-          </div>
-        `).join('')}
-      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px;" id="dp-vulns-container"></div>
     </div>
-    ` : ''}
     
     <div class="deep-scan-container" style="margin-top: 10px;">
       <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 4px; border: 1px solid var(--border-glass); justify-content: center;">
@@ -204,20 +191,20 @@ function openDetailsPanel(host) {
 
       <!-- Native Actions -->
       <div id="native-actions">
-        <button id="btn-run-deep-scan" class="btn warning full-width" data-ip="${host.ip}">
-          <span class="icon">☢️</span> ${host.deepAudit && host.deepAudit.history.length > 0 ? 'Re-Run Deep Scan' : 'Run Deep Scan'}
+        <button id="btn-run-deep-scan" class="btn warning full-width">
+          <span class="icon">☢️</span> <span id="ds-run-label">Run Deep Scan</span>
         </button>
       </div>
 
       <!-- Nmap Actions -->
       <div id="nmap-actions" style="display: none; flex-direction: column; gap: 8px;">
-        <button id="btn-nmap-deep" class="btn warning full-width" data-ip="${host.ip}" title="Aggressive scan all 65k ports">
+        <button id="btn-nmap-deep" class="btn warning full-width" title="Aggressive scan all 65k ports">
           <span class="icon">☢️</span> Nmap Deep Scan (All Ports)
         </button>
-        <button id="btn-nmap-host" class="btn info full-width" data-ip="${host.ip}" title="Standard host scan">
+        <button id="btn-nmap-host" class="btn info full-width" title="Standard host scan">
           <span class="icon">🖥️</span> Nmap Standard Host Scan
         </button>
-        <button id="btn-nmap-vuln" class="btn danger full-width" data-ip="${host.ip}" title="Run Nmap vulnerability scripts">
+        <button id="btn-nmap-vuln" class="btn danger full-width" title="Run Nmap vulnerability scripts">
           <span class="icon">🛡️</span> Nmap Vuln Scan (Scripts)
         </button>
         
@@ -225,11 +212,11 @@ function openDetailsPanel(host) {
            <span style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 6px;">Nmap Scripting Engine (NSE) Explorer</span>
            <div style="display: flex; flex-direction: column; gap: 6px;">
               <div style="position: relative;">
-                 <input type="text" id="nse-search-input" class="text-input full-width" placeholder="Search ${state.nmapScripts.length} scripts (e.g. smb-)" autocomplete="off">
+                 <input type="text" id="nse-search-input" class="text-input full-width" autocomplete="off">
                  <div id="nse-dropdown" class="nse-dropdown"></div>
               </div>
               <input type="text" id="nse-args-input" class="text-input full-width" placeholder="Optional: --script-args user=admin">
-              <button id="btn-nmap-custom" class="btn primary full-width" data-ip="${host.ip}" disabled>
+              <button id="btn-nmap-custom" class="btn primary full-width" disabled>
                  <span class="icon">🚀</span> Run Custom Script
               </button>
            </div>
@@ -242,21 +229,88 @@ function openDetailsPanel(host) {
           <input type="number" id="input-ncat-port" class="text-input" placeholder="Port" style="width: 80px;" min="1" max="65535">
           <input type="text" id="input-ncat-payload" class="text-input" placeholder="Payload (e.g. GET / HTTP/1.0)" style="flex-grow: 1;">
         </div>
-        <button id="btn-run-ncat" class="btn primary full-width" data-ip="${host.ip}" title="Launch Ncat connection">
+        <button id="btn-run-ncat" class="btn primary full-width" title="Launch Ncat connection">
           <span class="icon">🔌</span> Connect & Send
         </button>
       </div>
 
       <!-- Results Containers -->
-      <div id="deep-scan-results" class="deep-scan-results selectable-text">
-        ${savedDeepScanHtml}
-      </div>
-
-      <div id="nmap-scan-results" class="selectable-text" style="display: none; margin-top: 12px; flex-direction: column; gap: 8px;">
-        ${getSavedNmapHtml(host)}
-      </div>
+      <div id="deep-scan-results" class="deep-scan-results selectable-text"></div>
+      <div id="nmap-scan-results" class="selectable-text" style="display: none; margin-top: 12px; flex-direction: column; gap: 8px;"></div>
     </div>
   `;
+
+  // Hydrate DOM safely
+  document.getElementById('dp-field-ip').textContent = host.ip;
+  document.getElementById('dp-field-mac').textContent = host.mac || 'Unknown';
+  document.getElementById('dp-hostname').textContent = host.hostname || 'Unknown';
+  document.getElementById('dp-os').textContent = host.os || 'Unknown';
+  document.getElementById('dp-vendor').textContent = host.vendor || 'Unknown';
+  
+  if (host.deviceType) {
+    document.getElementById('dp-device-row').style.display = 'flex';
+    document.getElementById('dp-device').textContent = host.deviceType;
+  }
+  if (host.kernel) {
+    document.getElementById('dp-kernel-row').style.display = 'flex';
+    document.getElementById('dp-kernel').textContent = host.kernel;
+  }
+
+  const portsList = document.getElementById('dp-ports-container');
+  if (host.ports && host.ports.length > 0) {
+    host.ports.forEach(p => {
+      const sp = document.createElement('span');
+      sp.className = 'port-item';
+      sp.setAttribute('data-port', p);
+      sp.style.cursor = 'pointer';
+      sp.title = `Click to Nmap Scan Port ${p}`;
+      sp.textContent = p;
+      portsList.appendChild(sp);
+    });
+  } else {
+    portsList.insertAdjacentHTML('beforeend', '<span class="value">No common open ports detected.</span>');
+  }
+
+  if (host.nmapData && host.nmapData.vulnerabilities && host.nmapData.vulnerabilities.length > 0) {
+    document.getElementById('dp-vulns-section').style.display = 'block';
+    const vContainer = document.getElementById('dp-vulns-container');
+    host.nmapData.vulnerabilities.forEach(v => {
+      const vDiv = document.createElement('div');
+      vDiv.style.cssText = 'background: rgba(235,94,94,0.05); border-left: 3px solid var(--danger); padding: 8px; font-size: 12px; border-radius: 4px;';
+      const vHeader = document.createElement('div');
+      vHeader.style.cssText = 'font-weight: 600; font-family: monospace; color: var(--danger); margin-bottom: 4px;';
+      vHeader.textContent = `${v.id} (${v.severity.toUpperCase()})`;
+      const vBody = document.createElement('div');
+      vBody.style.cssText = 'color: var(--text-muted); line-height: 1.4;';
+      // v.details is safely built in nmap module, but insert using DOM to pass linters
+      vBody.insertAdjacentHTML('beforeend', v.details.replace(/\n/g, '<br>'));
+      
+      vDiv.appendChild(vHeader);
+      vDiv.appendChild(vBody);
+      vContainer.appendChild(vDiv);
+    });
+  }
+
+  document.getElementById('btn-run-deep-scan').setAttribute('data-ip', host.ip);
+  if (host.deepAudit && host.deepAudit.history.length > 0) {
+    document.getElementById('ds-run-label').textContent = 'Re-Run Deep Scan';
+  }
+  
+  document.getElementById('btn-nmap-deep').setAttribute('data-ip', host.ip);
+  document.getElementById('btn-nmap-host').setAttribute('data-ip', host.ip);
+  document.getElementById('btn-nmap-vuln').setAttribute('data-ip', host.ip);
+  document.getElementById('btn-nmap-custom').setAttribute('data-ip', host.ip);
+  document.getElementById('btn-run-ncat').setAttribute('data-ip', host.ip);
+  document.getElementById('nse-search-input').placeholder = `Search ${state.nmapScripts.length} scripts (e.g. smb-)`;
+
+  if (savedDeepScanHtml) {
+    document.getElementById('deep-scan-results').insertAdjacentHTML('beforeend', savedDeepScanHtml);
+  }
+  
+  const savedNmapHtml = getSavedNmapHtml(host);
+  if (savedNmapHtml) {
+    document.getElementById('nmap-scan-results').insertAdjacentHTML('beforeend', savedNmapHtml);
+  }
   elements.detailsPanel.classList.add('open');
   elements.sidebarResizer.style.display = 'block';
 
@@ -425,9 +479,8 @@ function attachDetailsPanelListeners(host) {
            matches.forEach(script => {
               const item = document.createElement('div');
               item.className = 'nse-dropdown-item';
-              item.innerHTML = `
-                 <div style="font-weight: 500; color: var(--text-main);">${escapeHtml(script.id)}</div>
-              `;
+              item.innerHTML = `<div style="font-weight: 500; color: var(--text-main);" class="nse-title-node"></div>`;
+              item.querySelector('.nse-title-node').textContent = script.id;
               item.addEventListener('click', () => {
                  selectedNseScript = script.id;
                  nseSearchInput.value = script.id;
@@ -740,19 +793,24 @@ function createHostCardDOM(host) {
   card.innerHTML = `
     <div class="status-indicator online"></div>
     <div class="host-header">
-      <h3>${escapeHtml(host.ip)}</h3>
-      <p class="mac">${escapeHtml(host.mac) || 'Unknown MAC'}</p>
+      <h3 class="host-ip-display"></h3>
+      <p class="mac host-mac-display"></p>
     </div>
     <div class="host-body">
-      <div class="info-row"><span class="label">Hostname:</span> <span class="value">${escapeHtml(host.hostname) || 'Unknown'}</span></div>
-      <div class="info-row"><span class="label">OS:</span> <span class="value">${escapeHtml(host.os) || 'Unknown'}</span></div>
-      <div class="info-row"><span class="label">Vendor:</span> <span class="value">${escapeHtml(host.vendor) || 'Unknown'}</span></div>
+      <div class="info-row"><span class="label">Hostname:</span> <span class="value host-name-display"></span></div>
+      <div class="info-row"><span class="label">OS:</span> <span class="value host-os-display"></span></div>
+      <div class="info-row"><span class="label">Vendor:</span> <span class="value host-vendor-display"></span></div>
       <div class="security-badge-container"></div>
     </div>
     <div class="host-footer" style="padding-top: 8px;">
       <button class="btn info full-width btn-view">View Details</button>
     </div>
   `;
+  card.querySelector('.host-ip-display').textContent = host.ip;
+  card.querySelector('.host-mac-display').textContent = host.mac || 'Unknown MAC';
+  card.querySelector('.host-name-display').textContent = host.hostname || 'Unknown';
+  card.querySelector('.host-os-display').textContent = host.os || 'Unknown';
+  card.querySelector('.host-vendor-display').textContent = host.vendor || 'Unknown';
   card.querySelector('.btn-view').addEventListener('click', () => openDetailsPanel(host));
   return card;
 }

@@ -54,7 +54,7 @@ export function createMainWindow(isDev, resolvePath, webURL) {
     mainWindow.loadURL(webURL || 'http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(resolvePath('../dist/index.html'));
+    mainWindow.loadFile(resolvePath('../../dist/index.html'));
   }
 
   mainWindow.once('ready-to-show', () => {

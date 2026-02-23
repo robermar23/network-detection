@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="public/logo.png" alt="NetSpecter Logo" width="200" />
+</div>
+
 # NetSpecter: Network Host Detection & Forensic Scanner
 
 A modern, cross-platform desktop application built with Electron, Node.js, and Vanilla JS that provides deep network visibility, OS fingerprinting, and forensic-level port scanning functionalities.

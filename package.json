@@ -7,6 +7,10 @@
   "type": "module",
   "repository": "robermar23/netspectre",
   "main": "src/main/main.js",
+  "imports": {
+    "#main/*": "./src/main/*",
+    "#shared/*": "./src/shared/*"
+  },
   "scripts": {
     "build:preload": "esbuild src/main/preload.js --bundle --format=cjs --outfile=src/main/preload.cjs --external:electron",
     "dev": "npm run build:preload && concurrently -k \"vite\" \"cross-env NODE_ENV=development electron .\"",
@@ -66,6 +70,7 @@
     ]
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.0.18",
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
     "electron": "^40.6.0",

@@ -34,21 +34,26 @@ export function createMainWindow(isDev, resolvePath, webURL) {
       preload: resolvePath('preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
+      allowRunningInsecureContent: false,
+      experimentalFeatures: false
     },
     show: false,
     backgroundColor: '#0f0f13'
   });
 
-  // Save window bounds on resize / move
-  mainWindow.on('resize', () => {
-    const bounds = mainWindow.getBounds();
-    store.set('windowBounds', bounds);
-  });
+  // Debounce save window bounds
+  let debounceTimer;
+  const saveBounds = () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        store.set('windowBounds', mainWindow.getBounds());
+      }
+    }, 500);
+  };
 
-  mainWindow.on('move', () => {
-    const bounds = mainWindow.getBounds();
-    store.set('windowBounds', bounds);
-  });
+  mainWindow.on('resize', saveBounds);
+  mainWindow.on('move', saveBounds);
 
   if (isDev) {
     mainWindow.loadURL(webURL || 'http://localhost:5173');

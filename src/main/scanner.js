@@ -270,7 +270,7 @@ export async function startNetworkScan(subnet, onHostFoundCallback, onCompleteCa
 
     let hostname = 'Unknown';
     try {
-      const { hostnames } = await os.promises?.dns?.reverse(ip) || await dnsPromises.reverse(ip);
+      let hostnames = await dnsPromises.reverse(ip);
       if (hostnames && hostnames.length > 0) hostname = hostnames[0];
     } catch(e) {} // DNS Reverse failure is common/expected
 

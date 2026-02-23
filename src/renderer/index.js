@@ -619,7 +619,7 @@ function renderAllHosts() {
   allCards.forEach(c => c.style.display = 'none');
   
   filteredHosts.forEach(host => {
-     let card = document.getElementById(`host-${host.ip.replace(/\\./g, '-')}`);
+     let card = document.getElementById(`host-${host.ip.replace(/\./g, '-')}`);
      if (!card) {
        card = createHostCardDOM(host);
      } else {
@@ -712,7 +712,7 @@ elements.btnDeepScanAll.addEventListener('click', () => {
 function createHostCardDOM(host) {
   const card = document.createElement('div');
   card.className = 'host-card glass-panel';
-  card.id = `host-${host.ip.replace(/\\./g, '-')}`;
+  card.id = `host-${host.ip.replace(/\./g, '-')}`;
   card.innerHTML = `
     <div class="status-indicator online"></div>
     <div class="host-header">
@@ -833,7 +833,7 @@ if (window.electronAPI) {
 
   window.electronAPI.onDeepScanResult((data) => {
     // 1. Permanently Save to Host State (For JSON Export & Live Score Retallying)
-    const hostIdx = state.state.hosts.findIndex(h => h.ip === data.ip);
+    const hostIdx = state.hosts.findIndex(h => h.ip === data.ip);
     if (hostIdx >= 0) {
        // Initialize structure if first port
        if (!state.hosts[hostIdx].deepAudit) {
@@ -847,7 +847,7 @@ if (window.electronAPI) {
          if (data.vulnerable && data.severity === 'warning') state.hosts[hostIdx].deepAudit.warnings++;
          
          // Dynamically re-render the card Security Badge safely
-         const card = document.getElementById(`host-${data.ip.replace(/\\./g, '-')}`);
+         const card = document.getElementById(`host-${data.ip.replace(/\./g, '-')}`);
          if (card) {
             const badgeContainer = card.querySelector('.security-badge-container');
             if (badgeContainer) badgeContainer.innerHTML = getSecurityBadgeHtml(state.hosts[hostIdx]);
@@ -995,7 +995,7 @@ if (window.electronAPI) {
     const port = type === 'port' ? target.split(':')[1] : null;
 
     // Save state
-    const hostIdx = state.state.hosts.findIndex(h => h.ip === ip);
+    const hostIdx = state.hosts.findIndex(h => h.ip === ip);
     if (hostIdx >= 0) {
       if (!state.hosts[hostIdx].nmapData) state.hosts[hostIdx].nmapData = { ports: {} };
       if (type === 'port') {

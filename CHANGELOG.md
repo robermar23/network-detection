@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/robermar23/network-detection/compare/v1.1.0...v1.1.1) (2026-02-23)
+
+
+### Bug Fixes
+
+* update node ver ([d836d41](https://github.com/robermar23/network-detection/commit/d836d413e534754de67a54367d44ff97b220e14f))
+
 ## [1.1.0](https://github.com/robermar23/network-detection/compare/v1.0.2...v1.1.0) (2026-02-23)
 
 

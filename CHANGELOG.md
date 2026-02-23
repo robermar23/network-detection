@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/robermar23/netspectre/compare/v1.1.1...v1.2.0) (2026-02-23)
+
+
+### Features
+
+* Add application logo and icons, and update README and favicon links. ([919326c](https://github.com/robermar23/netspectre/commit/919326c8f8395960ff4b8204142122c7fadbeb2e))
+
 ## [1.1.1](https://github.com/robermar23/network-detection/compare/v1.1.0...v1.1.1) (2026-02-23)
 
 

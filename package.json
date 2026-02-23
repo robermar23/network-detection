@@ -1,7 +1,7 @@
 {
   "name": "netspectre",
   "private": true,
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "Network Detection and Scanning tool",
   "author": "robermar23",
   "type": "module",

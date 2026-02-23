@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.0](https://github.com/robermar23/network-detection/compare/v1.0.2...v1.1.0) (2026-02-23)
+
+
+### Features
+
+* install options for windows setup ([c0fa755](https://github.com/robermar23/network-detection/commit/c0fa7551b7c50bfaf79e9cae80cfa2a8f0217556))
+
+
+### Bug Fixes
+
+* path wrong for release main page ([54b79fb](https://github.com/robermar23/network-detection/commit/54b79fbdd8f5d1ac76a224411c3af9be750855d0))
+
 ## [1.0.2](https://github.com/robermar23/network-detection/compare/v1.0.1...v1.0.2) (2026-02-23)
 
 

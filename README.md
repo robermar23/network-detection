@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="public/logo.png" alt="NetSpecter Logo" width="200" />
+  <img src="src/renderer/public/logo.png" alt="NetSpecter Logo" width="200" />
 </div>
 
 # NetSpecter: Network Host Detection & Forensic Scanner

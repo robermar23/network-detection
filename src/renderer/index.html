@@ -11,6 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="./icon.png" />
   <link rel="stylesheet" href="./style.css" />
 </head>
 
@@ -35,9 +36,13 @@
     <!-- Header / Controls -->
     <header class="glass-panel main-header" style="flex-direction: column; gap: 16px; align-items: stretch;">
       <div class="header-top" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-        <div class="header-titles">
-          <h1>NetSpecter</h1>
-          <p class="subtitle" id="status-text">Ready to scan.</p>
+        <div class="header-titles" style="display: flex; align-items: center; gap: 14px;">
+          <img src="./icon.png" alt="NetSpecter Icon"
+            style="height: 38px; width: auto; object-fit: contain; filter: drop-shadow(0 0 8px rgba(0, 255, 128, 0.4));">
+          <div>
+            <h1 style="margin: 0; line-height: 1.2; font-size: 24px; letter-spacing: -0.5px;">NetSpecter</h1>
+            <p class="subtitle" id="status-text" style="margin: 0; font-size: 13px; opacity: 0.8;">Ready to scan.</p>
+          </div>
         </div>
 
         <div class="control-group">

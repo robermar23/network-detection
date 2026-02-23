@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/robermar23/network-detection/compare/v1.0.0...v1.0.1) (2026-02-23)
+
+
+### Bug Fixes
+
+* merge release automation into a single action ([cd3d3d6](https://github.com/robermar23/network-detection/commit/cd3d3d69c9c5d39fe27e1ed4dfa0f0b4f22bfe89))
+
 ## 1.0.0 (2026-02-22)
 
 

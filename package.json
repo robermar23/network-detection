@@ -5,7 +5,7 @@
   "description": "Network Detection and Scanning tool",
   "author": "robermar23",
   "type": "module",
-  "repository": "robermar23/network-detection",
+  "repository": "robermar23/netspectre",
   "main": "src/main/main.js",
   "scripts": {
     "build:preload": "esbuild src/main/preload.js --bundle --format=cjs --outfile=src/main/preload.cjs --external:electron",

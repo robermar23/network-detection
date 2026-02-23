@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.0](https://github.com/robermar23/netspectre/compare/v1.2.1...v1.3.0) (2026-02-23)
+
+
+### Features
+
+* Implement initial network detection and scanning capabilities i… ([812b069](https://github.com/robermar23/netspectre/commit/812b069bd0994224ef39d754aa5f5748e8024696))
+
+
+### Bug Fixes
+
+* addressed the remaining 6 warnings flagged by Sourcery AI! ([ba977be](https://github.com/robermar23/netspectre/commit/ba977be358240de4bbe4cc4fae08523568b2eba4))
+
 ## [1.2.1](https://github.com/robermar23/netspectre/compare/v1.2.0...v1.2.1) (2026-02-23)
 
 

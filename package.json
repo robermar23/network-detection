@@ -1,5 +1,5 @@
 {
-  "name": "netspecter",
+  "name": "netspectre",
   "private": true,
   "version": "1.2.0",
   "description": "Network Detection and Scanning tool",
@@ -16,8 +16,8 @@
     "test": "vitest run --dir ./test"
   },
   "build": {
-    "appId": "com.robermar23.netspecter",
-    "productName": "Network Detection",
+    "appId": "com.robermar23.netspectre",
+    "productName": "Netspectre",
     "directories": {
       "output": "release/${version}"
     },
@@ -51,7 +51,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Network Detection"
+      "shortcutName": "Netspectre"
     },
     "linux": {
       "target": [

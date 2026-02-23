@@ -2,6 +2,17 @@ import { elements, domUtils } from './ui.js';
 import { api } from './api.js';
 import { state } from './state.js';
 
+// --- Utilities ---
+function escapeHtml(unsafe) {
+  if (unsafe == null) return '';
+  return String(unsafe)
+       .replace(/&/g, "&amp;")
+       .replace(/</g, "&lt;")
+       .replace(/>/g, "&gt;")
+       .replace(/"/g, "&quot;")
+       .replace(/'/g, "&#039;");
+}
+
 // --- Initialization ---
 api.checkNmap().then(async (installed) => {
   state.isNmapInstalled = installed;
@@ -133,31 +144,31 @@ function openDetailsPanel(host) {
   elements.detailsContent.innerHTML = `
     <div class="info-row">
       <span class="label">IP Address</span>
-      <div class="value">${host.ip}</div>
+      <div class="value">${escapeHtml(host.ip)}</div>
     </div>
     <div class="info-row">
       <span class="label">MAC Address</span>
-      <div class="value" style="font-family: monospace;">${host.mac || 'Unknown'}</div>
+      <div class="value" style="font-family: monospace;">${escapeHtml(host.mac) || 'Unknown'}</div>
     </div>
     <div class="info-row">
       <span class="label">Hostname</span>
-      <div class="value" id="dp-hostname">${host.hostname || 'Unknown'}</div>
+      <div class="value" id="dp-hostname">${escapeHtml(host.hostname) || 'Unknown'}</div>
     </div>
     <div class="info-row">
       <span class="label">Operating System</span>
-      <div class="value" id="dp-os">${host.os || 'Unknown'}</div>
+      <div class="value" id="dp-os">${escapeHtml(host.os) || 'Unknown'}</div>
     </div>
     <div class="info-row" id="dp-device-row" style="display: ${host.deviceType ? 'flex' : 'none'};">
       <span class="label">Device Type</span>
-      <div class="value" id="dp-device">${host.deviceType || ''}</div>
+      <div class="value" id="dp-device">${escapeHtml(host.deviceType) || ''}</div>
     </div>
     <div class="info-row" id="dp-kernel-row" style="display: ${host.kernel ? 'flex' : 'none'};">
       <span class="label" style="min-width: 60px;">Kernel</span>
-      <div class="value" id="dp-kernel" style="text-align: right;">${host.kernel || ''}</div>
+      <div class="value" id="dp-kernel" style="text-align: right;">${escapeHtml(host.kernel) || ''}</div>
     </div>
     <div class="info-row">
       <span class="label">Hardware Vendor</span>
-      <div class="value" id="dp-vendor">${host.vendor || 'Unknown'}</div>
+      <div class="value" id="dp-vendor">${escapeHtml(host.vendor) || 'Unknown'}</div>
     </div>
     
     <div style="margin-top: 10px; border-top: 1px solid var(--border-glass); padding-top: 16px;">
@@ -415,7 +426,7 @@ function attachDetailsPanelListeners(host) {
               const item = document.createElement('div');
               item.className = 'nse-dropdown-item';
               item.innerHTML = `
-                 <div style="font-weight: 500; color: var(--text-main);">${script.id}</div>
+                 <div style="font-weight: 500; color: var(--text-main);">${escapeHtml(script.id)}</div>
               `;
               item.addEventListener('click', () => {
                  selectedNseScript = script.id;
@@ -523,7 +534,7 @@ document.addEventListener('mouseup', () => {
   }
 });
 
-function getSecurityBadgeHtml(host) {
+function getSecurityBadgeData(host) {
   let posture = 'Unknown';
   let badgeClass = 'secondary';
   let icon = '❔';
@@ -561,7 +572,20 @@ function getSecurityBadgeHtml(host) {
     icon = '❔';
   }
 
-  return `<span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--${badgeClass}); color: var(--${badgeClass}); background: rgba(0,0,0,0.2);">${icon} ${posture}</span>`;
+  return { posture, badgeClass, icon };
+}
+
+function updateSecurityBadgeDOM(host, container) {
+  if (!container) return;
+  const data = getSecurityBadgeData(host);
+  const badgeSpan = document.createElement('span');
+  badgeSpan.className = 'security-badge-span';
+  badgeSpan.style.cssText = `font-size: 11px; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--${data.badgeClass}); color: var(--${data.badgeClass}); background: rgba(0,0,0,0.2);`;
+  badgeSpan.textContent = `${data.icon} ${data.posture}`;
+  
+  // Clear any existing badge content and append the DOM node
+  container.innerHTML = '';
+  container.appendChild(badgeSpan);
 }
 
 function getFilteredAndSortedHosts() {
@@ -716,14 +740,14 @@ function createHostCardDOM(host) {
   card.innerHTML = `
     <div class="status-indicator online"></div>
     <div class="host-header">
-      <h3>${host.ip}</h3>
-      <p class="mac">${host.mac || 'Unknown MAC'}</p>
+      <h3>${escapeHtml(host.ip)}</h3>
+      <p class="mac">${escapeHtml(host.mac) || 'Unknown MAC'}</p>
     </div>
     <div class="host-body">
-      <div class="info-row"><span class="label">Hostname:</span> <span class="value">${host.hostname || 'Unknown'}</span></div>
-      <div class="info-row"><span class="label">OS:</span> <span class="value">${host.os || 'Unknown'}</span></div>
-      <div class="info-row"><span class="label">Vendor:</span> <span class="value">${host.vendor || 'Unknown'}</span></div>
-      <div class="security-badge-container">${getSecurityBadgeHtml(host)}</div>
+      <div class="info-row"><span class="label">Hostname:</span> <span class="value">${escapeHtml(host.hostname) || 'Unknown'}</span></div>
+      <div class="info-row"><span class="label">OS:</span> <span class="value">${escapeHtml(host.os) || 'Unknown'}</span></div>
+      <div class="info-row"><span class="label">Vendor:</span> <span class="value">${escapeHtml(host.vendor) || 'Unknown'}</span></div>
+      <div class="security-badge-container"></div>
     </div>
     <div class="host-footer" style="padding-top: 8px;">
       <button class="btn info full-width btn-view">View Details</button>
@@ -850,7 +874,7 @@ if (window.electronAPI) {
          const card = document.getElementById(`host-${data.ip.replace(/\./g, '-')}`);
          if (card) {
             const badgeContainer = card.querySelector('.security-badge-container');
-            if (badgeContainer) badgeContainer.innerHTML = getSecurityBadgeHtml(state.hosts[hostIdx]);
+            if (badgeContainer) updateSecurityBadgeDOM(state.hosts[hostIdx], badgeContainer);
          }
        }
     }
@@ -948,7 +972,7 @@ if (window.electronAPI) {
     if (card && host) {
        const badgeContainer = card.querySelector('.security-badge-container');
        if (badgeContainer) {
-         badgeContainer.innerHTML = getSecurityBadgeHtml(host);
+         updateSecurityBadgeDOM(host, badgeContainer);
        }
     }
   });
@@ -1165,7 +1189,7 @@ if (window.electronAPI) {
         const card = document.getElementById(`host-${ip.replace(/\./g, '-')}`);
         if (card) {
            const badgeContainer = card.querySelector('.security-badge-container');
-           if (badgeContainer) badgeContainer.innerHTML = getSecurityBadgeHtml(state.hosts[hostIdx]);
+           if (badgeContainer) updateSecurityBadgeDOM(state.hosts[hostIdx], badgeContainer);
            
            try {
              const row1 = card.querySelector('.host-body .info-row:nth-child(1) .value');

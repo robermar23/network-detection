@@ -811,6 +811,7 @@ function createHostCardDOM(host) {
   card.querySelector('.host-name-display').textContent = host.hostname || 'Unknown';
   card.querySelector('.host-os-display').textContent = host.os || 'Unknown';
   card.querySelector('.host-vendor-display').textContent = host.vendor || 'Unknown';
+  updateSecurityBadgeDOM(host, card.querySelector('.security-badge-container'));
   card.querySelector('.btn-view').addEventListener('click', () => openDetailsPanel(host));
   return card;
 }

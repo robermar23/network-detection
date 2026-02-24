@@ -59,8 +59,48 @@
     },
     "linux": {
       "target": [
+        "deb",
+        "rpm",
         "AppImage"
+      ],
+      "executableName": "netspectre",
+      "icon": "src/renderer/public/icon.png",
+      "category": "Network",
+      "synopsis": "Network Host Detection & Forensic Scanner",
+      "desktop": {
+        "StartupWMClass": "netspectre"
+      }
+    },
+    "deb": {
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libuuid1",
+        "libsecret-1-0"
+      ],
+      "priority": "optional",
+      "section": "net"
+    },
+    "rpm": {
+      "depends": [
+        "gtk3",
+        "libnotify",
+        "nss",
+        "libXScrnSaver",
+        "libXtst",
+        "xdg-utils",
+        "at-spi2-core",
+        "libuuid",
+        "libsecret"
       ]
+    },
+    "appImage": {
+      "license": "MIT"
     },
     "publish": [
       {

@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0](https://github.com/robermar23/netspectre/compare/v1.3.1...v1.4.0) (2026-02-24)
+
+
+### Features
+
+* Implement main Electron process with network scanning, auto-upd… ([2537ecf](https://github.com/robermar23/netspectre/commit/2537ecfe8d62cf7453b9cf20eba775c1bb54f96a))
+* Implement main Electron process with network scanning, auto-updates, IPC handlers, and enhanced Linux packaging configurations. ([47dfaf5](https://github.com/robermar23/netspectre/commit/47dfaf5809c4907c95f67bf4b11dff9e6148e5fd))
+
 ## [1.3.1](https://github.com/robermar23/netspectre/compare/v1.3.0...v1.3.1) (2026-02-23)
 
 

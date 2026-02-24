@@ -25,7 +25,24 @@ export const elements = {
   btnDeepScanAll: document.getElementById('btn-deep-scan-all'),
   nmapInstallBanner: document.getElementById('nmap-install-banner'),
   btnCloseNmapBanner: document.getElementById('btn-close-nmap-banner'),
-  sidebarResizer: document.getElementById('sidebar-resizer')
+  sidebarResizer: document.getElementById('sidebar-resizer'),
+  // Scope Management
+  btnAddHosts: document.getElementById('btn-add-hosts'),
+  btnAddHostsCta: document.getElementById('btn-add-hosts-cta'),
+  scopeModalOverlay: document.getElementById('scope-modal-overlay'),
+  btnCloseScopeModal: document.getElementById('btn-close-scope-modal'),
+  btnScopeCancel: document.getElementById('btn-scope-cancel'),
+  btnScopeCommit: document.getElementById('btn-scope-commit'),
+  scopePendingCount: document.getElementById('scope-pending-count'),
+  // Blacklist
+  btnBlacklist: document.getElementById('btn-blacklist'),
+  blacklistModalOverlay: document.getElementById('blacklist-modal-overlay'),
+  btnCloseBlacklistModal: document.getElementById('btn-close-blacklist-modal'),
+  blacklistInput: document.getElementById('blacklist-input'),
+  btnBlacklistAdd: document.getElementById('btn-blacklist-add'),
+  blacklistEntries: document.getElementById('blacklist-entries'),
+  blacklistCount: document.getElementById('blacklist-count'),
+  btnBlacklistDone: document.getElementById('btn-blacklist-done')
 };
 
 export const domUtils = {
@@ -77,7 +94,7 @@ export const domUtils = {
       this.pulseRing.classList.remove('scanning');
       if (state.hosts.length === 0) {
         elements.emptyState.querySelector('h2').innerText = 'No Hosts Detected';
-        elements.emptyState.querySelector('p').innerText = 'Click "Scan Network" to begin discovering devices';
+        elements.emptyState.querySelector('p').innerText = 'Add hosts to begin working';
       }
     }
   }

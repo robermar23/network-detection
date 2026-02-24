@@ -10,6 +10,8 @@ import { startNetworkScan, stopNetworkScan, getNetworkInterfaces } from './scann
 import { runDeepScan, cancelDeepScan } from './deepScanner.js';
 import { checkNmapInstalled, runNmapScan, cancelNmapScan, runNcat, getNmapScripts } from './nmapScanner.js';
 import { createMainWindow } from './windowManager.js';
+import { parseNmapXml } from './nmapXmlParser.js';
+import { expandCIDR } from '#shared/networkConstants.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -257,4 +259,84 @@ ipcMain.handle(IPC_CHANNELS.CLEAR_RESULTS, async (event) => {
 
 ipcMain.on(IPC_CHANNELS.EXIT_APP, () => {
   app.quit();
+});
+
+// --- Target Scope Management ---
+
+ipcMain.handle(IPC_CHANNELS.IMPORT_SCOPE_FILE, async () => {
+  try {
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import Scope File',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Scope Files', extensions: ['txt', 'csv', 'tsv'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+
+    if (canceled || filePaths.length === 0) return { status: 'cancelled' };
+
+    const content = fs.readFileSync(filePaths[0], 'utf8');
+    const lines = content.split(/[\r\n]+/).map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+    const hosts = [];
+    const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+    const cidrRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}\/[0-9]{1,2}$/;
+    const seen = new Set();
+
+    for (const line of lines) {
+      // Handle CSV/TSV — take first column
+      const entry = line.split(/[,\t]/)[0].trim();
+      if (!entry) continue;
+
+      if (cidrRegex.test(entry)) {
+        // Expand CIDR range
+        const expanded = expandCIDR(entry);
+        for (const ip of expanded) {
+          if (!seen.has(ip)) {
+            seen.add(ip);
+            hosts.push({ ip, source: 'imported', hostname: '', mac: '', vendor: '', os: '' });
+          }
+        }
+      } else if (ipRegex.test(entry)) {
+        if (!seen.has(entry)) {
+          seen.add(entry);
+          hosts.push({ ip: entry, source: 'imported', hostname: '', mac: '', vendor: '', os: '' });
+        }
+      } else {
+        // Treat as hostname
+        if (!seen.has(entry)) {
+          seen.add(entry);
+          hosts.push({ ip: entry, source: 'imported', hostname: entry, mac: '', vendor: '', os: '' });
+        }
+      }
+    }
+
+    console.log(`Scope import: parsed ${hosts.length} hosts from ${filePaths[0]}`);
+    return { status: 'imported', hosts, path: filePaths[0] };
+  } catch (e) {
+    console.error('Scope import failed:', e);
+    return { status: 'error', error: e.message };
+  }
+});
+
+ipcMain.handle(IPC_CHANNELS.IMPORT_NMAP_XML, async () => {
+  try {
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import Nmap XML',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Nmap XML Files', extensions: ['xml'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+
+    if (canceled || filePaths.length === 0) return { status: 'cancelled' };
+
+    const hosts = parseNmapXml(filePaths[0]);
+    console.log(`Nmap XML import: parsed ${hosts.length} hosts from ${filePaths[0]}`);
+    return { status: 'imported', hosts, path: filePaths[0] };
+  } catch (e) {
+    console.error('Nmap XML import failed:', e);
+    return { status: 'error', error: e.message };
+  }
 });

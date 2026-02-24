@@ -70,6 +70,285 @@ elements.btnRefreshInterfaces.addEventListener('click', () => {
   initInterfaces();
 });
 
+// =============================================
+// === TARGET SCOPE MANAGEMENT MODULE ===
+// =============================================
+
+let discoverHostCount = 0; // Tracks hosts found during current modal discover session
+
+function openScopeModal() {
+  state.pendingHosts = [];
+  discoverHostCount = 0;
+  elements.scopeModalOverlay.classList.remove('hidden');
+  updatePendingCount();
+  // Clear previous pending lists
+  ['discover-pending-list', 'manual-pending-list', 'import-file-pending-list', 'import-nmap-pending-list'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  });
+  ['import-file-status', 'import-nmap-status', 'discover-status'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = ''; el.className = el.id === 'discover-status' ? 'discover-status' : 'import-status'; }
+  });
+  // Reset manual form
+  const manualIp = document.getElementById('manual-ip');
+  const manualHostname = document.getElementById('manual-hostname');
+  const manualMac = document.getElementById('manual-mac');
+  if (manualIp) manualIp.value = '';
+  if (manualHostname) manualHostname.value = '';
+  if (manualMac) manualMac.value = '';
+}
+
+function closeScopeModal() {
+  elements.scopeModalOverlay.classList.add('hidden');
+  state.pendingHosts = [];
+}
+
+function updatePendingCount() {
+  const staged = state.pendingHosts.length;
+  const total = staged + discoverHostCount;
+  if (discoverHostCount > 0 && staged === 0) {
+    // Discover-only: hosts are already live on dashboard
+    elements.scopePendingCount.textContent = `${discoverHostCount} host${discoverHostCount !== 1 ? 's' : ''} discovered (added live)`;
+    elements.btnScopeCommit.disabled = false;
+    elements.btnScopeCommit.innerHTML = '<span class="icon">✅</span> Done';
+  } else if (total > 0) {
+    const parts = [];
+    if (staged > 0) parts.push(`${staged} staged`);
+    if (discoverHostCount > 0) parts.push(`${discoverHostCount} discovered`);
+    elements.scopePendingCount.textContent = `${total} host${total !== 1 ? 's' : ''} (${parts.join(', ')})`;
+    elements.btnScopeCommit.disabled = false;
+    elements.btnScopeCommit.innerHTML = staged > 0 
+      ? '<span class="icon">✅</span> Add to Dashboard'
+      : '<span class="icon">✅</span> Done';
+  } else {
+    elements.scopePendingCount.textContent = '0 hosts staged';
+    elements.btnScopeCommit.disabled = true;
+    elements.btnScopeCommit.innerHTML = '<span class="icon">✅</span> Add to Dashboard';
+  }
+}
+
+function addPendingHost(host, listElId) {
+  // Deduplicate by IP
+  if (state.pendingHosts.some(h => h.ip === host.ip)) return;
+  state.pendingHosts.push(host);
+  updatePendingCount();
+  renderPendingItem(host, listElId);
+}
+
+function renderPendingItem(host, listElId) {
+  const listEl = document.getElementById(listElId);
+  if (!listEl) return;
+  const item = document.createElement('div');
+  item.className = 'pending-host-item';
+  item.setAttribute('data-ip', host.ip);
+
+  const infoSpan = document.createElement('span');
+  const ipSpan = document.createElement('span');
+  ipSpan.className = 'pending-ip';
+  ipSpan.textContent = host.ip;
+  infoSpan.appendChild(ipSpan);
+
+  if (host.hostname) {
+    const metaSpan = document.createElement('span');
+    metaSpan.className = 'pending-meta';
+    metaSpan.textContent = host.hostname;
+    infoSpan.appendChild(metaSpan);
+  }
+  if (host.os) {
+    const osSpan = document.createElement('span');
+    osSpan.className = 'pending-meta';
+    osSpan.textContent = `| ${host.os}`;
+    infoSpan.appendChild(osSpan);
+  }
+
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'btn-remove-pending';
+  removeBtn.textContent = '✕';
+  removeBtn.addEventListener('click', () => {
+    state.pendingHosts = state.pendingHosts.filter(h => h.ip !== host.ip);
+    item.remove();
+    updatePendingCount();
+  });
+
+  item.appendChild(infoSpan);
+  item.appendChild(removeBtn);
+  listEl.appendChild(item);
+}
+
+// Tab switching
+document.querySelectorAll('.modal-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    const pane = document.getElementById(`tab-${tab.getAttribute('data-tab')}`);
+    if (pane) pane.classList.add('active');
+  });
+});
+
+// Open/Close scope modal
+elements.btnAddHosts.addEventListener('click', openScopeModal);
+if (elements.btnAddHostsCta) elements.btnAddHostsCta.addEventListener('click', openScopeModal);
+elements.btnCloseScopeModal.addEventListener('click', closeScopeModal);
+elements.btnScopeCancel.addEventListener('click', closeScopeModal);
+
+// Commit pending hosts to dashboard
+elements.btnScopeCommit.addEventListener('click', () => {
+  const newHosts = state.pendingHosts;
+  newHosts.forEach(h => {
+    const existingIdx = state.hosts.findIndex(existing => existing.ip === h.ip);
+    if (existingIdx >= 0) {
+      // Merge — keep existing data, augment with new
+      state.hosts[existingIdx] = { ...state.hosts[existingIdx], ...h };
+    } else {
+      state.hosts.push(h);
+    }
+  });
+  elements.statusText.innerText = `Added ${newHosts.length} host${newHosts.length !== 1 ? 's' : ''} to scope.`;
+  closeScopeModal();
+  renderAllHosts();
+});
+
+// --- Manual Entry Tab ---
+document.getElementById('btn-manual-add')?.addEventListener('click', () => {
+  const ipInput = document.getElementById('manual-ip');
+  const hostnameInput = document.getElementById('manual-hostname');
+  const macInput = document.getElementById('manual-mac');
+  const ip = ipInput.value.trim();
+  if (!ip) { ipInput.focus(); return; }
+
+  const host = {
+    ip,
+    hostname: hostnameInput.value.trim() || '',
+    mac: macInput.value.trim() || '',
+    vendor: '',
+    os: '',
+    source: 'manual'
+  };
+  addPendingHost(host, 'manual-pending-list');
+  ipInput.value = '';
+  hostnameInput.value = '';
+  macInput.value = '';
+  ipInput.focus();
+});
+
+// --- Import File Tab ---
+document.getElementById('btn-browse-scope')?.addEventListener('click', async () => {
+  const statusEl = document.getElementById('import-file-status');
+  statusEl.textContent = 'Importing...';
+  statusEl.className = 'import-status';
+  const res = await api.importScopeFile();
+  if (res.status === 'imported') {
+    statusEl.textContent = `✅ Imported ${res.hosts.length} hosts from ${res.path.split(/[\\/]/).pop()}`;
+    statusEl.className = 'import-status success';
+    res.hosts.forEach(h => addPendingHost(h, 'import-file-pending-list'));
+  } else if (res.status === 'error') {
+    statusEl.textContent = `❌ Error: ${res.error}`;
+    statusEl.className = 'import-status error';
+  } else {
+    statusEl.textContent = '';
+    statusEl.className = 'import-status';
+  }
+});
+
+// --- Import Nmap XML Tab ---
+document.getElementById('btn-browse-nmap')?.addEventListener('click', async () => {
+  const statusEl = document.getElementById('import-nmap-status');
+  statusEl.textContent = 'Parsing XML...';
+  statusEl.className = 'import-status';
+  const res = await api.importNmapXml();
+  if (res.status === 'imported') {
+    statusEl.textContent = `✅ Parsed ${res.hosts.length} hosts from ${res.path.split(/[\\/]/).pop()}`;
+    statusEl.className = 'import-status success';
+    res.hosts.forEach(h => addPendingHost(h, 'import-nmap-pending-list'));
+  } else if (res.status === 'error') {
+    statusEl.textContent = `❌ Error: ${res.error}`;
+    statusEl.className = 'import-status error';
+  } else {
+    statusEl.textContent = '';
+    statusEl.className = 'import-status';
+  }
+});
+
+// =============================================
+// === BLACKLIST MANAGEMENT MODULE ===
+// =============================================
+
+function isBlacklisted(host) {
+  if (state.blacklist.length === 0) return false;
+  for (const entry of state.blacklist) {
+    if (entry === host.ip) return true;
+    if (host.mac && entry.toUpperCase() === host.mac.toUpperCase()) return true;
+    // Simple CIDR match (basic check — match against expanded range is expensive, so just match prefix)
+    if (entry.includes('/')) {
+      const [net, bits] = entry.split('/');
+      const prefix = parseInt(bits, 10);
+      if (!isNaN(prefix) && prefix >= 8 && prefix <= 32) {
+        const netParts = net.split('.').map(Number);
+        const hostParts = host.ip.split('.').map(Number);
+        if (netParts.length === 4 && hostParts.length === 4) {
+          const netNum = ((netParts[0] << 24) | (netParts[1] << 16) | (netParts[2] << 8) | netParts[3]) >>> 0;
+          const hostNum = ((hostParts[0] << 24) | (hostParts[1] << 16) | (hostParts[2] << 8) | hostParts[3]) >>> 0;
+          const mask = (0xFFFFFFFF << (32 - prefix)) >>> 0;
+          if ((netNum & mask) === (hostNum & mask)) return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function renderBlacklistEntries() {
+  elements.blacklistEntries.innerHTML = '';
+  state.blacklist.forEach((entry, idx) => {
+    const el = document.createElement('div');
+    el.className = 'blacklist-entry';
+    const label = document.createElement('span');
+    label.textContent = `🚫 ${entry}`;
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'btn-remove-bl';
+    removeBtn.textContent = '✕';
+    removeBtn.addEventListener('click', () => {
+      state.blacklist.splice(idx, 1);
+      renderBlacklistEntries();
+      renderAllHosts();
+    });
+    el.appendChild(label);
+    el.appendChild(removeBtn);
+    elements.blacklistEntries.appendChild(el);
+  });
+  elements.blacklistCount.textContent = `${state.blacklist.length} entr${state.blacklist.length !== 1 ? 'ies' : 'y'}`;
+}
+
+elements.btnBlacklist.addEventListener('click', () => {
+  elements.blacklistModalOverlay.classList.remove('hidden');
+  renderBlacklistEntries();
+});
+
+elements.btnCloseBlacklistModal.addEventListener('click', () => {
+  elements.blacklistModalOverlay.classList.add('hidden');
+});
+
+elements.btnBlacklistDone.addEventListener('click', () => {
+  elements.blacklistModalOverlay.classList.add('hidden');
+  renderAllHosts();
+});
+
+elements.btnBlacklistAdd.addEventListener('click', () => {
+  const val = elements.blacklistInput.value.trim();
+  if (!val) return;
+  if (state.blacklist.includes(val)) return;
+  state.blacklist.push(val);
+  elements.blacklistInput.value = '';
+  renderBlacklistEntries();
+});
+
+// Allow Enter key in blacklist input
+elements.blacklistInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') elements.btnBlacklistAdd.click();
+});
+
 // --- Details Panel Logic ---
 function getActionButtonsHtml(ip, data) {
   let actionsHtml = '';
@@ -647,6 +926,8 @@ function getFilteredAndSortedHosts() {
   const vendorTerm = elements.filterVendor.value.toLowerCase();
   
   let filteredHosts = state.hosts.filter((h) => {
+    // Blacklist enforcement
+    if (isBlacklisted(h)) return false;
     const matchIp = h.ip ? h.ip.toLowerCase().includes(ipTerm) : false;
     const matchOs = h.os ? String(h.os).toLowerCase().includes(osTerm) : false;
     const matchVendor = h.vendor ? String(h.vendor).toLowerCase().includes(vendorTerm) : false;
@@ -790,8 +1071,15 @@ function createHostCardDOM(host) {
   const card = document.createElement('div');
   card.className = 'host-card glass-panel';
   card.id = `host-${host.ip.replace(/\./g, '-')}`;
+  
+  // Determine source-based status indicator class
+  const sourceClass = host.source === 'manual' ? 'manual' 
+    : host.source === 'imported' ? 'imported'
+    : host.source === 'nmap-import' ? 'nmap-import'
+    : 'online';
+  
   card.innerHTML = `
-    <div class="status-indicator online"></div>
+    <div class="status-indicator ${sourceClass}"></div>
     <div class="host-header">
       <h3 class="host-ip-display"></h3>
       <p class="mac host-mac-display"></p>
@@ -807,6 +1095,16 @@ function createHostCardDOM(host) {
     </div>
   `;
   card.querySelector('.host-ip-display').textContent = host.ip;
+  
+  // Add source badge next to IP if not discovered
+  if (host.source && host.source !== 'discovered') {
+    const badge = document.createElement('span');
+    badge.className = `source-badge ${host.source}`;
+    const sourceLabels = { manual: '📌 Manual', imported: '📄 Imported', 'nmap-import': '📥 Nmap' };
+    badge.textContent = sourceLabels[host.source] || host.source;
+    card.querySelector('.host-ip-display').appendChild(badge);
+  }
+  
   card.querySelector('.host-mac-display').textContent = host.mac || 'Unknown MAC';
   card.querySelector('.host-name-display').textContent = host.hostname || 'Unknown';
   card.querySelector('.host-os-display').textContent = host.os || 'Unknown';
@@ -871,6 +1169,16 @@ if (window.electronAPI) {
       state.hosts.push(hostData);
     }
     debouncedRenderAllHosts();
+    
+    // If scope modal is open, track discovered hosts for the footer counter
+    if (!elements.scopeModalOverlay.classList.contains('hidden')) {
+      discoverHostCount++;
+      const discoverStatus = document.getElementById('discover-status');
+      if (discoverStatus) {
+        discoverStatus.textContent = `Discovered ${discoverHostCount} host${discoverHostCount !== 1 ? 's' : ''} so far...`;
+      }
+      updatePendingCount();
+    }
   });
 
   window.electronAPI.onScanComplete(({ message }) => {

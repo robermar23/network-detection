@@ -4,5 +4,7 @@ export const state = {
   isScanning: false,
   hosts: [], // Store host objects
   isNmapInstalled: false,
-  nmapScripts: [] // Store custom Nmap scripts catalog
+  nmapScripts: [], // Store custom Nmap scripts catalog
+  blacklist: [], // Blacklisted IPs/CIDRs/MACs
+  pendingHosts: [] // Staging area inside scope modal before committing
 };

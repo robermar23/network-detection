@@ -84,7 +84,7 @@
         "libsecret-1-0"
       ],
       "priority": "optional",
-      "section": "net"
+      "packageCategory": "net"
     },
     "rpm": {
       "depends": [

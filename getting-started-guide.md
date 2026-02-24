@@ -1,6 +1,49 @@
 # NetSpecter: Getting Started Guide
 
-Welcome to NetSpecter! This guide will walk you through the core features of the application, how to get started, and how to harness the advanced capabilities of the integrated Nmap orchestration engine.
+Welcome to NetSpecter! This guide will walk you through installing the application, its core features, and how to harness the advanced capabilities of the integrated Nmap orchestration engine.
+
+## 0. Installation
+
+### Windows
+Download the `.exe` installer from the [Releases page](https://github.com/robermar23/netspectre/releases) and double-click to install.
+
+### macOS
+Download the `.dmg`, open it, and drag NetSpecter into your **Applications** folder.
+
+### Linux
+**Recommended:** Download the `.deb` package and install:
+```bash
+sudo dpkg -i netspectre_*.deb
+sudo apt-get install -f   # resolve any missing dependencies
+```
+
+**Fedora/RHEL:** Download the `.rpm` package:
+```bash
+sudo dnf install ./netspectre-*.rpm
+```
+
+**AppImage (advanced):** Requires `libfuse2` (`sudo apt install libfuse2`). Run as a normal user — **do not use `sudo`**. If you must run as root, pass `--no-sandbox`:
+```bash
+chmod +x Netspectre-*.AppImage
+./Netspectre-*.AppImage --no-sandbox
+```
+
+> **💡 Tip:** NetSpecter detects if you are running as root on Linux and automatically applies the `--no-sandbox` flag internally. For the `.deb` and `.rpm` packages, this is handled seamlessly.
+
+### Optional: Nmap
+For advanced scanning features, install [Nmap](https://nmap.org/download.html) via your system package manager:
+```bash
+# Debian/Ubuntu
+sudo apt install nmap
+
+# Fedora/RHEL
+sudo dnf install nmap
+
+# macOS (Homebrew)
+brew install nmap
+
+# Windows — download from nmap.org
+```
 
 ## 1. Initial Setup and Scanning
 

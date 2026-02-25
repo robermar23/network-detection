@@ -3,7 +3,10 @@
   "private": true,
   "version": "1.4.1",
   "description": "Network Detection and Scanning tool",
-  "author": "robermar23",
+  "author": {
+    "name": "Robert Evans",
+    "email": "robermar2@gmail.com"
+  },
   "type": "module",
   "repository": "robermar23/netspectre",
   "main": "src/main/main.js",
@@ -67,38 +70,16 @@
       "icon": "src/renderer/public/icon.png",
       "category": "Network",
       "synopsis": "Network Host Detection & Forensic Scanner",
+      "maintainer": "robermar23 <robermar23@users.noreply.github.com>",
       "desktop": {
         "StartupWMClass": "netspectre"
       }
     },
     "deb": {
-      "depends": [
-        "libgtk-3-0",
-        "libnotify4",
-        "libnss3",
-        "libxss1",
-        "libxtst6",
-        "xdg-utils",
-        "libatspi2.0-0",
-        "libuuid1",
-        "libsecret-1-0"
-      ],
       "priority": "optional",
       "packageCategory": "net"
     },
-    "rpm": {
-      "depends": [
-        "gtk3",
-        "libnotify",
-        "nss",
-        "libXScrnSaver",
-        "libXtst",
-        "xdg-utils",
-        "at-spi2-core",
-        "libuuid",
-        "libsecret"
-      ]
-    },
+    "rpm": {},
     "appImage": {
       "license": "LICENSE"
     },

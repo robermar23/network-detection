@@ -195,38 +195,133 @@ elements.btnScopeCancel.addEventListener('click', closeScopeModal);
 
 // Commit pending hosts to dashboard
 elements.btnScopeCommit.addEventListener('click', () => {
-  const newHosts = state.pendingHosts;
+  const newHosts = [...state.pendingHosts];
+  const hostsToProbe = [];
   newHosts.forEach(h => {
     const existingIdx = state.hosts.findIndex(existing => existing.ip === h.ip);
     if (existingIdx >= 0) {
-      // Merge — keep existing data, augment with new
       state.hosts[existingIdx] = { ...state.hosts[existingIdx], ...h };
     } else {
       state.hosts.push(h);
+    }
+    // Queue non-discovered hosts for auto-probe
+    if (h.source && h.source !== 'discovered') {
+      hostsToProbe.push(h.ip);
     }
   });
   elements.statusText.innerText = `Added ${newHosts.length} host${newHosts.length !== 1 ? 's' : ''} to scope.`;
   closeScopeModal();
   renderAllHosts();
+  
+  // Auto-probe each non-discovered host in the background
+  if (hostsToProbe.length > 0) {
+    const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+    const validIps = hostsToProbe.filter(ip => ipRegex.test(ip));
+    if (validIps.length > 0) {
+      elements.statusText.innerText = `Probing ${validIps.length} host${validIps.length !== 1 ? 's' : ''}...`;
+      let completed = 0;
+      validIps.forEach(ip => {
+        api.probeHost(ip).then(result => {
+          completed++;
+          if (!result || result.error) {
+            elements.statusText.innerText = `Probed ${completed}/${validIps.length} hosts...`;
+            return;
+          }
+          // Update state with enriched data
+          const hostIdx = state.hosts.findIndex(h => h.ip === ip);
+          if (hostIdx >= 0) {
+            const host = state.hosts[hostIdx];
+            if (result.hostname && result.hostname !== 'Unknown') host.hostname = result.hostname;
+            if (result.mac) host.mac = result.mac;
+            if (result.vendor && result.vendor !== 'Unknown') host.vendor = result.vendor;
+            if (result.os && result.os !== 'Unknown OS') host.os = result.os;
+            if (result.ports && result.ports.length > 0) host.ports = result.ports;
+          }
+          // Update card DOM inline
+          const card = document.getElementById(`host-${ip.replace(/\./g, '-')}`);
+          if (card) {
+            const indicator = card.querySelector('.status-indicator');
+            if (indicator) {
+              indicator.classList.remove('checking');
+              indicator.classList.add(result.alive ? 'online' : 'offline');
+              indicator.title = result.alive ? `Online (${result.pingTime || '?'}ms)` : 'Offline / Unreachable';
+            }
+            const nameEl = card.querySelector('.host-name-display');
+            if (nameEl && result.hostname) nameEl.textContent = result.hostname;
+            const osEl = card.querySelector('.host-os-display');
+            if (osEl && result.os) osEl.textContent = result.os;
+            const vendorEl = card.querySelector('.host-vendor-display');
+            if (vendorEl && result.vendor) vendorEl.textContent = result.vendor;
+            const macEl = card.querySelector('.host-mac-display');
+            if (macEl && result.mac) macEl.textContent = result.mac;
+          }
+          if (completed >= validIps.length) {
+            elements.statusText.innerText = `Probe complete. ${completed} host${completed !== 1 ? 's' : ''} enriched.`;
+          } else {
+            elements.statusText.innerText = `Probing... ${completed}/${validIps.length} hosts complete.`;
+          }
+        }).catch(() => {
+          completed++;
+        });
+      });
+    }
+  }
 });
 
 // --- Manual Entry Tab ---
+// Inline CIDR expansion for the renderer (pure math, no Node APIs)
+function expandCIDRClient(cidr) {
+  const parts = cidr.trim().split('/');
+  if (parts.length !== 2) return [];
+  const ipParts = parts[0].split('.').map(Number);
+  const prefix = parseInt(parts[1], 10);
+  if (ipParts.length !== 4 || ipParts.some(p => isNaN(p) || p < 0 || p > 255)) return [];
+  if (isNaN(prefix) || prefix < 16 || prefix > 32) return [];
+  const ipNum = ((ipParts[0] << 24) | (ipParts[1] << 16) | (ipParts[2] << 8) | ipParts[3]) >>> 0;
+  const hostBits = 32 - prefix;
+  const totalHosts = 1 << hostBits;
+  const networkAddr = (ipNum >>> hostBits) << hostBits >>> 0;
+  const ips = [];
+  const start = prefix < 31 ? 1 : 0;
+  const end = prefix < 31 ? totalHosts - 1 : totalHosts;
+  for (let i = start; i < end && ips.length < 65536; i++) {
+    const addr = (networkAddr + i) >>> 0;
+    ips.push(`${(addr >>> 24) & 0xFF}.${(addr >>> 16) & 0xFF}.${(addr >>> 8) & 0xFF}.${addr & 0xFF}`);
+  }
+  return ips;
+}
+
 document.getElementById('btn-manual-add')?.addEventListener('click', () => {
   const ipInput = document.getElementById('manual-ip');
   const hostnameInput = document.getElementById('manual-hostname');
   const macInput = document.getElementById('manual-mac');
-  const ip = ipInput.value.trim();
-  if (!ip) { ipInput.focus(); return; }
+  const ipVal = ipInput.value.trim();
+  if (!ipVal) { ipInput.focus(); return; }
 
-  const host = {
-    ip,
-    hostname: hostnameInput.value.trim() || '',
-    mac: macInput.value.trim() || '',
-    vendor: '',
-    os: '',
-    source: 'manual'
-  };
-  addPendingHost(host, 'manual-pending-list');
+  const cidrRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}\/[0-9]{1,2}$/;
+  if (cidrRegex.test(ipVal)) {
+    // CIDR: expand to individual IPs
+    const expanded = expandCIDRClient(ipVal);
+    if (expanded.length === 0) {
+      ipInput.style.borderColor = 'var(--danger)';
+      setTimeout(() => { ipInput.style.borderColor = ''; }, 2000);
+      return;
+    }
+    expanded.forEach(ip => {
+      addPendingHost({ ip, hostname: '', mac: '', vendor: '', os: '', source: 'manual' }, 'manual-pending-list');
+    });
+  } else {
+    // Single host
+    const host = {
+      ip: ipVal,
+      hostname: hostnameInput.value.trim() || '',
+      mac: macInput.value.trim() || '',
+      vendor: '',
+      os: '',
+      source: 'manual'
+    };
+    addPendingHost(host, 'manual-pending-list');
+  }
   ipInput.value = '';
   hostnameInput.value = '';
   macInput.value = '';
@@ -520,6 +615,7 @@ function openDetailsPanel(host) {
   `;
 
   // Hydrate DOM safely
+  document.getElementById('dp-header-ip').textContent = host.ip;
   document.getElementById('dp-field-ip').textContent = host.ip;
   document.getElementById('dp-field-mac').textContent = host.mac || 'Unknown';
   document.getElementById('dp-hostname').textContent = host.hostname || 'Unknown';
@@ -1072,14 +1168,9 @@ function createHostCardDOM(host) {
   card.className = 'host-card glass-panel';
   card.id = `host-${host.ip.replace(/\./g, '-')}`;
   
-  // Determine source-based status indicator class
-  const sourceClass = host.source === 'manual' ? 'manual' 
-    : host.source === 'imported' ? 'imported'
-    : host.source === 'nmap-import' ? 'nmap-import'
-    : 'online';
-  
   card.innerHTML = `
-    <div class="status-indicator ${sourceClass}"></div>
+    <div class="status-indicator checking" title="Checking connectivity..."></div>
+    <button class="btn-remove-host" title="Remove host">✕</button>
     <div class="host-header">
       <h3 class="host-ip-display"></h3>
       <p class="mac host-mac-display"></p>
@@ -1111,6 +1202,39 @@ function createHostCardDOM(host) {
   card.querySelector('.host-vendor-display').textContent = host.vendor || 'Unknown';
   updateSecurityBadgeDOM(host, card.querySelector('.security-badge-container'));
   card.querySelector('.btn-view').addEventListener('click', () => openDetailsPanel(host));
+  
+  // Remove host button
+  card.querySelector('.btn-remove-host').addEventListener('click', (e) => {
+    e.stopPropagation();
+    state.hosts = state.hosts.filter(h => h.ip !== host.ip);
+    card.remove();
+    renderAllHosts();
+  });
+  
+  // Async ping check for real connectivity
+  const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+  if (ipRegex.test(host.ip)) {
+    api.pingHost(host.ip).then(result => {
+      const indicator = card.querySelector('.status-indicator');
+      if (!indicator) return;
+      indicator.classList.remove('checking');
+      if (result && result.alive) {
+        indicator.classList.add('online');
+        indicator.title = `Online (${result.time}ms)`;
+      } else {
+        indicator.classList.add('offline');
+        indicator.title = 'Offline / Unreachable';
+      }
+    }).catch(() => {
+      const indicator = card.querySelector('.status-indicator');
+      if (indicator) {
+        indicator.classList.remove('checking');
+        indicator.classList.add('offline');
+        indicator.title = 'Ping failed';
+      }
+    });
+  }
+  
   return card;
 }
 

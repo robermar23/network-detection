@@ -16,12 +16,13 @@ if (process.platform === 'linux' && process.getuid && process.getuid() === 0) {
   console.warn('[NetSpecter] Running as root — Chromium sandbox disabled via --no-sandbox.');
 }
 
-import { startNetworkScan, stopNetworkScan, getNetworkInterfaces } from './scanner.js';
+import { startNetworkScan, stopNetworkScan, getNetworkInterfaces, probeHost } from './scanner.js';
 import { runDeepScan, cancelDeepScan } from './deepScanner.js';
 import { checkNmapInstalled, runNmapScan, cancelNmapScan, runNcat, getNmapScripts } from './nmapScanner.js';
 import { createMainWindow } from './windowManager.js';
 import { parseNmapXml } from './nmapXmlParser.js';
 import { expandCIDR } from '#shared/networkConstants.js';
+import ping from 'ping';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -348,5 +349,31 @@ ipcMain.handle(IPC_CHANNELS.IMPORT_NMAP_XML, async () => {
   } catch (e) {
     console.error('Nmap XML import failed:', e);
     return { status: 'error', error: e.message };
+  }
+});
+
+ipcMain.handle(IPC_CHANNELS.PING_HOST, async (event, ip) => {
+  try {
+    const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+    if (!ip || !ipRegex.test(ip)) {
+      return { alive: false, time: null, error: 'Invalid IP format' };
+    }
+    const res = await ping.promise.probe(ip, { timeout: 2 });
+    return { alive: res.alive, time: res.time };
+  } catch (e) {
+    return { alive: false, time: null, error: e.message };
+  }
+});
+
+ipcMain.handle(IPC_CHANNELS.PROBE_HOST, async (event, ip) => {
+  try {
+    const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+    if (!ip || !ipRegex.test(ip)) {
+      return { error: 'Invalid IP format' };
+    }
+    const result = await probeHost(ip);
+    return result;
+  } catch (e) {
+    return { ip, error: e.message, alive: false };
   }
 });

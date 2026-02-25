@@ -37,5 +37,7 @@ export const IPC_CHANNELS = {
 
   // Target Scope Management
   IMPORT_SCOPE_FILE: 'import-scope-file',
-  IMPORT_NMAP_XML: 'import-nmap-xml'
+  IMPORT_NMAP_XML: 'import-nmap-xml',
+  PING_HOST: 'ping-host',
+  PROBE_HOST: 'probe-host'
 };

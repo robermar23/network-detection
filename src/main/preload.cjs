@@ -32,7 +32,9 @@ var IPC_CHANNELS = {
   NMAP_SCAN_ERROR: "nmap-scan-error",
   // Target Scope Management
   IMPORT_SCOPE_FILE: "import-scope-file",
-  IMPORT_NMAP_XML: "import-nmap-xml"
+  IMPORT_NMAP_XML: "import-nmap-xml",
+  PING_HOST: "ping-host",
+  PROBE_HOST: "probe-host"
 };
 
 // src/main/preload.js
@@ -57,6 +59,8 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
   // Target Scope Management
   importScopeFile: () => import_electron.ipcRenderer.invoke(IPC_CHANNELS.IMPORT_SCOPE_FILE),
   importNmapXml: () => import_electron.ipcRenderer.invoke(IPC_CHANNELS.IMPORT_NMAP_XML),
+  pingHost: (ip) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.PING_HOST, ip),
+  probeHost: (ip) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.PROBE_HOST, ip),
   // Event Listeners for streams
   onHostFound: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.HOST_FOUND, (_event, value) => callback(value)),
   onScanComplete: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.SCAN_COMPLETE, (_event, value) => callback(value)),

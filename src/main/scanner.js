@@ -309,3 +309,49 @@ export async function startNetworkScan(subnet, onHostFoundCallback, onCompleteCa
 export function stopNetworkScan() {
   scanActive = false;
 }
+
+/**
+ * Probe a single host to enrich it with discovery data.
+ * Runs the same pipeline as network discovery: ping, reverse DNS, ARP, ports, vendor, OS.
+ * @param {string} ip - Host IP to probe
+ * @returns {Object} Enriched host data
+ */
+export async function probeHost(ip) {
+  const result = { ip };
+
+  // Ping
+  try {
+    const pingRes = await ping.promise.probe(ip, { timeout: 2 });
+    result.alive = pingRes.alive;
+    result.pingTime = pingRes.time;
+  } catch {
+    result.alive = false;
+  }
+
+  // Reverse DNS
+  try {
+    const hostnames = await dnsPromises.reverse(ip);
+    if (hostnames && hostnames.length > 0) result.hostname = hostnames[0];
+  } catch {}
+
+  // ARP table for MAC
+  try {
+    const arpTable = await getArpTable();
+    if (arpTable[ip]) {
+      result.mac = arpTable[ip];
+      result.vendor = await getVendorFromMac(result.mac);
+    }
+  } catch {}
+
+  // Port scan
+  try {
+    result.ports = await scanPorts(ip);
+  } catch {
+    result.ports = [];
+  }
+
+  // OS guess
+  result.os = guessOS(result.ports || [], result.vendor || 'Unknown');
+
+  return result;
+}

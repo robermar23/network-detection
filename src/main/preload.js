@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Target Scope Management
   importScopeFile: () => ipcRenderer.invoke(IPC_CHANNELS.IMPORT_SCOPE_FILE),
   importNmapXml: () => ipcRenderer.invoke(IPC_CHANNELS.IMPORT_NMAP_XML),
+  pingHost: (ip) => ipcRenderer.invoke(IPC_CHANNELS.PING_HOST, ip),
+  probeHost: (ip) => ipcRenderer.invoke(IPC_CHANNELS.PROBE_HOST, ip),
 
   // Event Listeners for streams
   onHostFound: (callback) => ipcRenderer.on(IPC_CHANNELS.HOST_FOUND, (_event, value) => callback(value)),

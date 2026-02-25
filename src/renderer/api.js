@@ -16,5 +16,7 @@ export const api = {
   exitApp: () => window.electronAPI.exitApp(),
   // Target Scope Management
   importScopeFile: async () => window.electronAPI.importScopeFile(),
-  importNmapXml: async () => window.electronAPI.importNmapXml()
+  importNmapXml: async () => window.electronAPI.importNmapXml(),
+  pingHost: async (ip) => window.electronAPI.pingHost(ip),
+  probeHost: async (ip) => window.electronAPI.probeHost(ip)
 };

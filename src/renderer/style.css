@@ -227,6 +227,22 @@ body {
   margin: 0;
 }
 
+.details-header-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.details-header-ip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--primary);
+  background: rgba(94, 114, 235, 0.12);
+  padding: 2px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(94, 114, 235, 0.25);
+}
+
 .details-content {
   padding: 20px;
   overflow-y: auto;
@@ -563,7 +579,7 @@ body {
 /* Host Card (Base Shared Container) */
 .host-card {
   position: relative;
-  padding: 20px;
+  padding: 20px 20px 20px 28px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -583,8 +599,9 @@ body {
 
 .status-indicator {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: 50%;
+  left: 8px;
+  transform: translateY(-50%);
   width: 10px;
   height: 10px;
   border-radius: 50%;
@@ -1144,3 +1161,61 @@ body {
   color: var(--text-muted);
 }
 
+/* Remove Host Button on Card */
+.btn-remove-host {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  opacity: 0;
+  transition: all var(--transition-fast);
+  z-index: 2;
+}
+
+.host-card {
+  position: relative;
+}
+
+.host-card:hover .btn-remove-host {
+  opacity: 0.6;
+}
+
+.btn-remove-host:hover {
+  opacity: 1 !important;
+  background: rgba(235, 94, 94, 0.15);
+  border-color: rgba(235, 94, 94, 0.3);
+  color: var(--danger);
+}
+
+/* Connectivity Status Indicators */
+.status-indicator.checking {
+  background: #636e72;
+  box-shadow: 0 0 6px rgba(99, 110, 114, 0.4);
+  animation: pulse-checking 1.5s ease-in-out infinite;
+}
+
+.status-indicator.offline {
+  background: #d63031;
+  box-shadow: 0 0 8px rgba(214, 48, 49, 0.4);
+  animation: none;
+}
+
+.status-indicator.online {
+  background: var(--success);
+  box-shadow: 0 0 10px rgba(59, 226, 130, 0.4);
+}
+
+@keyframes pulse-checking {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}

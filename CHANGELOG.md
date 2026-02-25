@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/robermar23/netspectre/compare/v1.4.0...v1.4.1) (2026-02-24)
+
+
+### Bug Fixes
+
+* fix build error for deb ([997e729](https://github.com/robermar23/netspectre/commit/997e729c227d7bc09a98030eb499b61d8d1ffe71))
+
 ## [1.4.0](https://github.com/robermar23/netspectre/compare/v1.3.1...v1.4.0) (2026-02-24)
 
 

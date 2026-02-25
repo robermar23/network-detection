@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.3](https://github.com/robermar23/netspectre/compare/v1.4.2...v1.4.3) (2026-02-25)
+
+
+### Bug Fixes
+
+* put back dependences ([20d96ac](https://github.com/robermar23/netspectre/commit/20d96ac3fb5e0048632e9e3410e8c4665d555073))
+
 ## [1.4.2](https://github.com/robermar23/netspectre/compare/v1.4.1...v1.4.2) (2026-02-25)
 
 

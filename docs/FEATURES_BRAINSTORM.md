@@ -155,7 +155,7 @@ Rather than splitting NetSpecter into two separate products (e.g., "NetSpecter" 
 2. Immediately pivot to the **Web App** workspace to launch an intercepting proxy against that host's web application (L7)
 3. Find a SQLi vulnerability, pivot back to **Network** to check what other ports are open for lateral movement
 
-If these are separate applications, the user constantly copy-pastes IPs and loses context between two windows. That friction destroys the unified value proposition that makes NetSpecter unique.
+If these are separate applications, the user constantly has to copy and paste IPs and loses context between two windows. That friction destroys the unified value proposition that makes NetSpecter unique.
 
 ### Proposed UI Structure
 

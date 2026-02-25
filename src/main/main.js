@@ -2,9 +2,12 @@ import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
 import pkg from 'electron-updater';
 const { autoUpdater } = pkg;
 import { IPC_CHANNELS } from '#shared/ipc.js';
+import { expandCIDR } from '#shared/networkConstants.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import dns from 'dns';
+const dnsPromises = dns.promises;
 import { spawn, exec } from 'child_process';
 
 // --- Linux Root/Sandbox Detection ---
@@ -287,16 +290,23 @@ ipcMain.handle(IPC_CHANNELS.IMPORT_SCOPE_FILE, async () => {
 
     if (canceled || filePaths.length === 0) return { status: 'cancelled' };
 
-    const content = fs.readFileSync(filePaths[0], 'utf8');
-    const lines = content.split(/[\r\n]+/).map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+    const content = await fs.promises.readFile(filePaths[0], 'utf8');
+    const lines = content.split(/[\\r\\n]+/).map(l => l.trim()).filter(l => l && !l.startsWith('#'));
     const hosts = [];
     const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
     const cidrRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}\/[0-9]{1,2}$/;
     const seen = new Set();
 
+    let processedCount = 0;
+
     for (const line of lines) {
+      // Yield to event loop every 100 items to prevent UI freezes on massive scopes
+      if (++processedCount % 100 === 0) {
+        await new Promise(setImmediate);
+      }
+
       // Handle CSV/TSV — take first column
-      const entry = line.split(/[,\t]/)[0].trim();
+      const entry = line.split(/[,\\t]/)[0].trim();
       if (!entry) continue;
 
       if (cidrRegex.test(entry)) {
@@ -314,10 +324,18 @@ ipcMain.handle(IPC_CHANNELS.IMPORT_SCOPE_FILE, async () => {
           hosts.push({ ip: entry, source: 'imported', hostname: '', mac: '', vendor: '', os: '' });
         }
       } else {
-        // Treat as hostname
-        if (!seen.has(entry)) {
-          seen.add(entry);
-          hosts.push({ ip: entry, source: 'imported', hostname: entry, mac: '', vendor: '', os: '' });
+        // Treat as hostname, attempt DNS lookup
+        try {
+           const lookupResult = await dnsPromises.lookup(entry, { family: 4 });
+           if (lookupResult && lookupResult.address) {
+             const resolvedIp = lookupResult.address;
+             if (!seen.has(resolvedIp)) {
+                seen.add(resolvedIp);
+                hosts.push({ ip: resolvedIp, source: 'imported', hostname: entry, mac: '', vendor: '', os: '' });
+             }
+           }
+        } catch (err) {
+           console.warn(`Failed to resolve imported hostname ${entry}:`, err.message);
         }
       }
     }

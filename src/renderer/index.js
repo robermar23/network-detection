@@ -1,6 +1,8 @@
 import { elements, domUtils } from './ui.js';
 import { api } from './api.js';
 import { state } from './state.js';
+import { createScanAllOrchestrator } from './scanAllOrchestrator.js';
+import { ipRegex, expandCIDR } from '#shared/networkConstants.js';
 
 // --- Utilities ---
 function escapeHtml(unsafe) {
@@ -108,18 +110,20 @@ function closeScopeModal() {
   state.pendingHosts = [];
 }
 
-function updatePendingCount() {
-  const staged = state.pendingHosts.length;
-  const total = staged + discoverHostCount;
-  if (discoverHostCount > 0 && staged === 0) {
+function setScopeCommitState({ staged, discovered }) {
+  const total = staged + discovered;
+  if (discovered > 0 && staged === 0) {
     // Discover-only: hosts are already live on dashboard
-    elements.scopePendingCount.textContent = `${discoverHostCount} host${discoverHostCount !== 1 ? 's' : ''} discovered (added live)`;
+    elements.scopePendingCount.textContent = `${discovered} host${discovered !== 1 ? 's' : ''} discovered (added live)`;
     elements.btnScopeCommit.disabled = false;
     elements.btnScopeCommit.innerHTML = '<span class="icon">✅</span> Done';
-  } else if (total > 0) {
+    return;
+  }
+
+  if (total > 0) {
     const parts = [];
     if (staged > 0) parts.push(`${staged} staged`);
-    if (discoverHostCount > 0) parts.push(`${discoverHostCount} discovered`);
+    if (discovered > 0) parts.push(`${discovered} discovered`);
     elements.scopePendingCount.textContent = `${total} host${total !== 1 ? 's' : ''} (${parts.join(', ')})`;
     elements.btnScopeCommit.disabled = false;
     elements.btnScopeCommit.innerHTML = staged > 0 
@@ -130,6 +134,12 @@ function updatePendingCount() {
     elements.btnScopeCommit.disabled = true;
     elements.btnScopeCommit.innerHTML = '<span class="icon">✅</span> Add to Dashboard';
   }
+}
+
+function updatePendingCount() {
+  const staged = state.pendingHosts.length;
+  const discovered = discoverHostCount;
+  setScopeCommitState({ staged, discovered });
 }
 
 function addPendingHost(host, listElId) {
@@ -197,6 +207,65 @@ if (elements.btnAddHostsCta) elements.btnAddHostsCta.addEventListener('click', o
 elements.btnCloseScopeModal.addEventListener('click', closeScopeModal);
 elements.btnScopeCancel.addEventListener('click', closeScopeModal);
 
+// Queue for Probe Host
+const probeQueue = [];
+let activeProbes = 0;
+const MAX_CONCURRENT_PROBES = 10;
+
+function pumpProbeQueue() {
+  while (activeProbes < MAX_CONCURRENT_PROBES && probeQueue.length > 0) {
+    const { ip, validIps, completedObj } = probeQueue.shift();
+    activeProbes++;
+    api.probeHost(ip).then(result => {
+      activeProbes--;
+      completedObj.count++;
+      if (!result || result.error) {
+        elements.statusText.innerText = `Probed ${completedObj.count}/${validIps.length} hosts...`;
+      } else {
+        // Update state with enriched data
+        const hostIdx = state.hosts.findIndex(h => h.ip === ip);
+        if (hostIdx >= 0) {
+          const host = state.hosts[hostIdx];
+          if (result.hostname && result.hostname !== 'Unknown') host.hostname = result.hostname;
+          if (result.mac) host.mac = result.mac;
+          if (result.vendor && result.vendor !== 'Unknown') host.vendor = result.vendor;
+          if (result.os && result.os !== 'Unknown OS') host.os = result.os;
+          if (result.ports && result.ports.length > 0) host.ports = result.ports;
+        }
+        // Update card DOM inline
+        const card = document.getElementById(`host-${ip.replace(/\\./g, '-')}`);
+        if (card) {
+          const indicator = card.querySelector('.status-indicator');
+          if (indicator) {
+            indicator.classList.remove('checking');
+            indicator.classList.add(result.alive ? 'online' : 'offline');
+            indicator.title = result.alive ? `Online (${result.pingTime || '?'}ms)` : 'Offline / Unreachable';
+          }
+          const nameEl = card.querySelector('.host-name-display');
+          if (nameEl && result.hostname) nameEl.textContent = result.hostname;
+          const osEl = card.querySelector('.host-os-display');
+          if (osEl && result.os) osEl.textContent = result.os;
+          const vendorEl = card.querySelector('.host-vendor-display');
+          if (vendorEl && result.vendor) vendorEl.textContent = result.vendor;
+          const macEl = card.querySelector('.host-mac-display');
+          if (macEl && result.mac) macEl.textContent = result.mac;
+        }
+      }
+      
+      if (completedObj.count >= validIps.length) {
+        elements.statusText.innerText = `Probe complete. ${completedObj.count} host${completedObj.count !== 1 ? 's' : ''} enriched.`;
+      } else {
+        elements.statusText.innerText = `Probing... ${completedObj.count}/${validIps.length} hosts complete.`;
+      }
+      pumpProbeQueue();
+    }).catch(() => {
+      activeProbes--;
+      completedObj.count++;
+      pumpProbeQueue();
+    });
+  }
+}
+
 // Commit pending hosts to dashboard
 elements.btnScopeCommit.addEventListener('click', () => {
   const newHosts = [...state.pendingHosts];
@@ -219,81 +288,20 @@ elements.btnScopeCommit.addEventListener('click', () => {
   
   // Auto-probe each non-discovered host in the background
   if (hostsToProbe.length > 0) {
-    const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
     const validIps = hostsToProbe.filter(ip => ipRegex.test(ip));
     if (validIps.length > 0) {
       elements.statusText.innerText = `Probing ${validIps.length} host${validIps.length !== 1 ? 's' : ''}...`;
-      let completed = 0;
+      const completedObj = { count: 0 };
       validIps.forEach(ip => {
-        api.probeHost(ip).then(result => {
-          completed++;
-          if (!result || result.error) {
-            elements.statusText.innerText = `Probed ${completed}/${validIps.length} hosts...`;
-            return;
-          }
-          // Update state with enriched data
-          const hostIdx = state.hosts.findIndex(h => h.ip === ip);
-          if (hostIdx >= 0) {
-            const host = state.hosts[hostIdx];
-            if (result.hostname && result.hostname !== 'Unknown') host.hostname = result.hostname;
-            if (result.mac) host.mac = result.mac;
-            if (result.vendor && result.vendor !== 'Unknown') host.vendor = result.vendor;
-            if (result.os && result.os !== 'Unknown OS') host.os = result.os;
-            if (result.ports && result.ports.length > 0) host.ports = result.ports;
-          }
-          // Update card DOM inline
-          const card = document.getElementById(`host-${ip.replace(/\./g, '-')}`);
-          if (card) {
-            const indicator = card.querySelector('.status-indicator');
-            if (indicator) {
-              indicator.classList.remove('checking');
-              indicator.classList.add(result.alive ? 'online' : 'offline');
-              indicator.title = result.alive ? `Online (${result.pingTime || '?'}ms)` : 'Offline / Unreachable';
-            }
-            const nameEl = card.querySelector('.host-name-display');
-            if (nameEl && result.hostname) nameEl.textContent = result.hostname;
-            const osEl = card.querySelector('.host-os-display');
-            if (osEl && result.os) osEl.textContent = result.os;
-            const vendorEl = card.querySelector('.host-vendor-display');
-            if (vendorEl && result.vendor) vendorEl.textContent = result.vendor;
-            const macEl = card.querySelector('.host-mac-display');
-            if (macEl && result.mac) macEl.textContent = result.mac;
-          }
-          if (completed >= validIps.length) {
-            elements.statusText.innerText = `Probe complete. ${completed} host${completed !== 1 ? 's' : ''} enriched.`;
-          } else {
-            elements.statusText.innerText = `Probing... ${completed}/${validIps.length} hosts complete.`;
-          }
-        }).catch(() => {
-          completed++;
-        });
+        probeQueue.push({ ip, validIps, completedObj });
       });
+      pumpProbeQueue();
     }
   }
 });
 
 // --- Manual Entry Tab ---
-// Inline CIDR expansion for the renderer (pure math, no Node APIs)
-function expandCIDRClient(cidr) {
-  const parts = cidr.trim().split('/');
-  if (parts.length !== 2) return [];
-  const ipParts = parts[0].split('.').map(Number);
-  const prefix = parseInt(parts[1], 10);
-  if (ipParts.length !== 4 || ipParts.some(p => isNaN(p) || p < 0 || p > 255)) return [];
-  if (isNaN(prefix) || prefix < 16 || prefix > 32) return [];
-  const ipNum = ((ipParts[0] << 24) | (ipParts[1] << 16) | (ipParts[2] << 8) | ipParts[3]) >>> 0;
-  const hostBits = 32 - prefix;
-  const totalHosts = 1 << hostBits;
-  const networkAddr = (ipNum >>> hostBits) << hostBits >>> 0;
-  const ips = [];
-  const start = prefix < 31 ? 1 : 0;
-  const end = prefix < 31 ? totalHosts - 1 : totalHosts;
-  for (let i = start; i < end && ips.length < 65536; i++) {
-    const addr = (networkAddr + i) >>> 0;
-    ips.push(`${(addr >>> 24) & 0xFF}.${(addr >>> 16) & 0xFF}.${(addr >>> 8) & 0xFF}.${addr & 0xFF}`);
-  }
-  return ips;
-}
+// --- Manual Entry Tab ---
 
 document.getElementById('btn-manual-add')?.addEventListener('click', () => {
   const ipInput = document.getElementById('manual-ip');
@@ -302,10 +310,9 @@ document.getElementById('btn-manual-add')?.addEventListener('click', () => {
   const ipVal = ipInput.value.trim();
   if (!ipVal) { ipInput.focus(); return; }
 
-  const cidrRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}\/[0-9]{1,2}$/;
-  if (cidrRegex.test(ipVal)) {
+  if (ipVal.includes('/')) {
     // CIDR: expand to individual IPs
-    const expanded = expandCIDRClient(ipVal);
+    const expanded = expandCIDR(ipVal);
     if (expanded.length === 0) {
       ipInput.style.borderColor = 'var(--danger)';
       setTimeout(() => { ipInput.style.borderColor = ''; }, 2000);
@@ -1107,6 +1114,51 @@ function debouncedRenderAllHosts() {
 // --- Scan All Dropdown Logic ---
 let scanAllType = 'native'; // 'native' | 'nmap-host' | 'nmap-vuln' | 'nmap-deep'
 
+const scanAll = createScanAllOrchestrator({
+  api,
+  elements,
+  getHosts: getFilteredAndSortedHosts,
+  updateUI: () => {
+    if (!scanAll.state.isRunning) {
+      const labelText = document.querySelector('.scan-all-option.active')?.getAttribute('data-label') || 'Deep Scan All';
+      const iconMap = { native: '⚡', 'nmap-host': '🖥️', 'nmap-vuln': '🛡️', 'nmap-deep': '☢️' };
+      elements.btnDeepScanAll.querySelector('.icon').textContent = iconMap[scanAll.state.type] || '⚡';
+      elements.scanAllLabel.textContent = labelText;
+      if (scanAll.state.total > 0 && scanAll.state.completed === scanAll.state.total) {
+        elements.statusText.innerText = `Scan all finished (${scanAll.state.total} hosts).`;
+      }
+      return;
+    }
+    
+    // Calculate global percentage based on completed and active
+    let activePercentageSum = 0;
+    for (const ip of scanAll.state.active) {
+      if (scanAll.state.hostProgress[ip] !== undefined) activePercentageSum += scanAll.state.hostProgress[ip];
+    }
+    let totalPercentageVal = 0;
+    if (scanAll.state.total > 0) {
+      const totalMaxProgress = scanAll.state.total * 100;
+      const currentProgressTotal = (scanAll.state.completed * 100) + activePercentageSum;
+      totalPercentageVal = Math.round((currentProgressTotal / totalMaxProgress) * 100);
+    }
+
+    if (scanAll.state.type === 'native') {
+      elements.statusText.innerText = `Deep scanning: ${scanAll.state.completed}/${scanAll.state.total} hosts completed - ${totalPercentageVal}%`;
+    } else {
+      const activeList = [...scanAll.state.active].map(aip => {
+        const p = scanAll.state.hostProgress[aip];
+        return p !== undefined ? `${aip} (${p.toFixed(0)}%)` : aip;
+      }).join(', ');
+      const scanLabel = `Nmap ${scanAll.state.type.replace('nmap-', '')} scan`;
+      elements.statusText.innerText = `${scanLabel}: ${scanAll.state.completed}/${scanAll.state.total} done | Active: ${activeList}`;
+    }
+    
+    // Sync abort button state
+    elements.btnDeepScanAll.querySelector('.icon').textContent = '🛑';
+    elements.scanAllLabel.textContent = `Cancel (${scanAll.state.completed}/${scanAll.state.total})`;
+  }
+});
+
 elements.btnScanAllMenu.addEventListener('click', (e) => {
   e.stopPropagation();
   elements.scanAllDropdown.classList.toggle('hidden');
@@ -1125,6 +1177,7 @@ document.querySelectorAll('.scan-all-option').forEach(opt => {
     document.querySelectorAll('.scan-all-option').forEach(o => o.classList.remove('active'));
     opt.classList.add('active');
     scanAllType = opt.getAttribute('data-scan-type');
+    scanAll.setType(scanAllType);
     const label = opt.getAttribute('data-label');
     elements.scanAllLabel.textContent = label;
     // Update the main button icon
@@ -1134,94 +1187,18 @@ document.querySelectorAll('.scan-all-option').forEach(opt => {
   });
 });
 
-// Deep Scan All UI
-let isDeepScanningAll = false;
-let deepScanAllQueue = [];
-let deepScanAllActive = new Set();
-let deepScanAllTotal = 0;
-let deepScanAllCompleted = 0;
-let deepScanHostProgress = {};
-
-function updateDeepScanAllProgress() {
-  if (!isDeepScanningAll) return;
-  let activePercentageSum = 0;
-  for (const ip of deepScanAllActive) {
-    if (deepScanHostProgress[ip] !== undefined) activePercentageSum += deepScanHostProgress[ip];
-  }
-  let totalPercentageVal = 0;
-  if (deepScanAllTotal > 0) {
-    const totalMaxProgress = deepScanAllTotal * 100;
-    const currentProgressTotal = (deepScanAllCompleted * 100) + activePercentageSum;
-    totalPercentageVal = Math.round((currentProgressTotal / totalMaxProgress) * 100);
-  }
-  const scanLabel = scanAllType === 'native' ? 'Deep scanning' : `Nmap ${scanAllType.replace('nmap-', '')} scanning`;
-  elements.statusText.innerText = `${scanLabel}: ${deepScanAllCompleted}/${deepScanAllTotal} hosts completed - ${totalPercentageVal}%`;
-}
-
-function pumpDeepScanQueue() {
-  if (!isDeepScanningAll) return;
-  while (deepScanAllActive.size < 3 && deepScanAllQueue.length > 0) {
-    const ip = deepScanAllQueue.shift();
-    deepScanAllActive.add(ip);
-
-    if (scanAllType === 'native') {
-      // Native deep scan
-      const hostIdx = state.hosts.findIndex(h => h.ip === ip);
-      if (hostIdx >= 0) state.hosts[hostIdx].deepAudit = { history: [], vulnerabilities: 0, warnings: 0 };
-      
-      const btnRunDeepScan = document.getElementById('btn-run-deep-scan');
-      if (btnRunDeepScan && btnRunDeepScan.getAttribute('data-ip') === ip) {
-         btnRunDeepScan.setAttribute('data-scanning', 'true');
-         btnRunDeepScan.innerHTML = `<span class="icon">🛑</span> Cancel Scan...`;
-      }
-      api.runDeepScan(ip);
-    } else {
-      // Nmap scan type
-      const nmapType = scanAllType.replace('nmap-', ''); // 'host', 'vuln', 'deep'
-      api.runNmapScan(nmapType, ip);
-    }
-  }
-  if (deepScanAllQueue.length === 0 && deepScanAllActive.size === 0) {
-    isDeepScanningAll = false;
-    const labelText = document.querySelector('.scan-all-option.active')?.getAttribute('data-label') || 'Deep Scan All';
-    const iconMap = { native: '⚡', 'nmap-host': '🖥️', 'nmap-vuln': '🛡️', 'nmap-deep': '☢️' };
-    elements.btnDeepScanAll.querySelector('.icon').textContent = iconMap[scanAllType] || '⚡';
-    elements.scanAllLabel.textContent = labelText;
-    elements.statusText.innerText = `Scan all finished (${deepScanAllTotal} hosts).`;
-  } else updateDeepScanAllProgress();
-}
-
 elements.btnDeepScanAll.addEventListener('click', () => {
-  if (isDeepScanningAll) {
-    isDeepScanningAll = false;
-    for (const ip of deepScanAllActive) {
-      if (scanAllType === 'native') {
-        api.cancelDeepScan(ip);
-      } else {
-        api.cancelNmapScan(ip);
-      }
-    }
-    deepScanAllActive.clear();
-    const labelText = document.querySelector('.scan-all-option.active')?.getAttribute('data-label') || 'Deep Scan All';
-    elements.scanAllLabel.textContent = labelText;
-    elements.btnDeepScanAll.querySelector('.icon').textContent = { native: '⚡', 'nmap-host': '🖥️', 'nmap-vuln': '🛡️', 'nmap-deep': '☢️' }[scanAllType] || '⚡';
+  if (scanAll.state.isRunning) {
+    scanAll.cancel();
     return;
   }
-  const filteredHosts = getFilteredAndSortedHosts();
-  if (filteredHosts.length === 0) return;
-  isDeepScanningAll = true;
-  deepScanAllQueue = filteredHosts.map(h => h.ip);
-  deepScanAllTotal = deepScanAllQueue.length;
-  deepScanAllCompleted = 0;
-  elements.btnDeepScanAll.querySelector('.icon').textContent = '🛑';
-  elements.scanAllLabel.textContent = `Cancel (0/${deepScanAllTotal})`;
-  pumpDeepScanQueue();
+  scanAll.start();
 });
 
-function createHostCardDOM(host) {
+function buildHostCard(host) {
   const card = document.createElement('div');
   card.className = 'host-card glass-panel';
-  card.id = `host-${host.ip.replace(/\./g, '-')}`;
+  card.id = `host-${host.ip.replace(/\\./g, '-')}`;
   
   card.innerHTML = `
     <div class="status-indicator checking" title="Checking connectivity..."></div>
@@ -1241,7 +1218,16 @@ function createHostCardDOM(host) {
     </div>
   `;
   card.querySelector('.host-ip-display').textContent = host.ip;
+  card.querySelector('.host-mac-display').textContent = host.mac || 'Unknown MAC';
+  card.querySelector('.host-name-display').textContent = host.hostname || 'Unknown';
+  card.querySelector('.host-os-display').textContent = host.os || 'Unknown';
+  card.querySelector('.host-vendor-display').textContent = host.vendor || 'Unknown';
+  updateSecurityBadgeDOM(host, card.querySelector('.security-badge-container'));
   
+  return card;
+}
+
+function attachHostCardBehavior(card, host) {
   // Add source badge next to IP if not discovered
   if (host.source && host.source !== 'discovered') {
     const badge = document.createElement('span');
@@ -1251,11 +1237,6 @@ function createHostCardDOM(host) {
     card.querySelector('.host-ip-display').appendChild(badge);
   }
   
-  card.querySelector('.host-mac-display').textContent = host.mac || 'Unknown MAC';
-  card.querySelector('.host-name-display').textContent = host.hostname || 'Unknown';
-  card.querySelector('.host-os-display').textContent = host.os || 'Unknown';
-  card.querySelector('.host-vendor-display').textContent = host.vendor || 'Unknown';
-  updateSecurityBadgeDOM(host, card.querySelector('.security-badge-container'));
   card.querySelector('.btn-view').addEventListener('click', () => openDetailsPanel(host));
   
   // Remove host button
@@ -1267,7 +1248,6 @@ function createHostCardDOM(host) {
   });
   
   // Async ping check for real connectivity
-  const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
   if (ipRegex.test(host.ip)) {
     api.pingHost(host.ip).then(result => {
       const indicator = card.querySelector('.status-indicator');
@@ -1289,7 +1269,11 @@ function createHostCardDOM(host) {
       }
     });
   }
-  
+}
+
+function createHostCardDOM(host) {
+  const card = buildHostCard(host);
+  attachHostCardBehavior(card, host);
   return card;
 }
 
@@ -1378,9 +1362,8 @@ if (window.electronAPI) {
     }
     
     // Update global progress if part of Deep Scan All
-    if (isDeepScanningAll && deepScanAllActive.has(data.ip)) {
-      deepScanHostProgress[data.ip] = data.percent;
-      updateDeepScanAllProgress();
+    if (scanAll.state.isRunning && scanAll.state.active.has(data.ip)) {
+      scanAll.onHostProgress(data.ip, data.percent);
     }
 
     // Update individual host card
@@ -1494,21 +1477,12 @@ if (window.electronAPI) {
       }
     }
 
-    if (deepScanAllActive.has(ip)) {
-      deepScanHostProgress[ip] = 100; // Force to 100% just in case before removal
-      updateDeepScanAllProgress();
+    if (scanAll.state.active.has(ip)) {
+      scanAll.onHostProgress(ip, 100); // Force to 100% just in case before removal
       
       // Delay removal slightly so the UI gets a chance to render 100%
       setTimeout(() => {
-        if (deepScanAllActive.has(ip)) {
-          deepScanAllActive.delete(ip);
-          delete deepScanHostProgress[ip]; // Clean up memory
-          deepScanAllCompleted++;
-          if (isDeepScanningAll) {
-             pumpDeepScanQueue();
-             updateDeepScanAllProgress(); // Ensure 100% calculation reflects removed item
-          }
-        }
+        scanAll.onHostDone(ip);
       }, 500);
     }
     
@@ -1551,19 +1525,11 @@ if (window.electronAPI) {
     }
 
     // Update scan-all status bar with per-host Nmap progress
-    if (isDeepScanningAll && scanAllType !== 'native') {
+    if (scanAll.state.isRunning && scanAll.state.type !== 'native') {
       const ip = type === 'port' ? data.target.split(':')[0] : data.target;
-      if (deepScanAllActive.has(ip) && timingMatch) {
-        const pct = parseFloat(timingMatch[1]).toFixed(0);
-        deepScanHostProgress[ip] = parseFloat(timingMatch[1]);
+      if (scanAll.state.active.has(ip) && timingMatch) {
+        scanAll.onHostProgress(ip, parseFloat(timingMatch[1]));
       }
-      // Build active hosts status
-      const activeList = [...deepScanAllActive].map(aip => {
-        const p = deepScanHostProgress[aip];
-        return p !== undefined ? `${aip} (${p.toFixed(0)}%)` : aip;
-      }).join(', ');
-      const scanLabel = `Nmap ${scanAllType.replace('nmap-', '')} scan`;
-      elements.statusText.innerText = `${scanLabel}: ${deepScanAllCompleted}/${deepScanAllTotal} done | Active: ${activeList}`;
     }
     
     const bannerBlock = document.getElementById(`nmap-live-banner-${type}`);
@@ -1833,12 +1799,8 @@ if (window.electronAPI) {
     }
 
     // Scan-all queue: advance to next host if this was part of a batch nmap scan
-    if (isDeepScanningAll && scanAllType !== 'native' && deepScanAllActive.has(ip)) {
-      deepScanAllActive.delete(ip);
-      delete deepScanHostProgress[ip];
-      deepScanAllCompleted++;
-      elements.scanAllLabel.textContent = `Cancel (${deepScanAllCompleted}/${deepScanAllTotal})`;
-      pumpDeepScanQueue();
+    if (scanAll.state.isRunning && scanAll.state.type !== 'native' && scanAll.state.active.has(ip)) {
+      scanAll.onHostDone(ip);
     }
   });
 
@@ -1861,12 +1823,8 @@ if (window.electronAPI) {
     }
 
     // Scan-all queue: advance even on error
-    if (isDeepScanningAll && scanAllType !== 'native' && deepScanAllActive.has(ip)) {
-      deepScanAllActive.delete(ip);
-      delete deepScanHostProgress[ip];
-      deepScanAllCompleted++;
-      elements.scanAllLabel.textContent = `Cancel (${deepScanAllCompleted}/${deepScanAllTotal})`;
-      pumpDeepScanQueue();
+    if (scanAll.state.isRunning && scanAll.state.type !== 'native' && scanAll.state.active.has(ip)) {
+      scanAll.onHostDone(ip);
     }
   });
 }

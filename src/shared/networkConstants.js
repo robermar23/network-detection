@@ -63,7 +63,7 @@ export const COMMON_PORTS = [
   21, 22, 23, 25, 53, 80, 110, 111, 135, 139, 143, 443, 445, 548, 993, 995, 1723, 3306, 3389, 5900, 8080
 ];
 
-
+export const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
 
 /**
  * Expand a CIDR notation string into an array of individual IP addresses.

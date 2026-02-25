@@ -311,22 +311,13 @@ export function stopNetworkScan() {
 }
 
 /**
- * Probe a single host to enrich it with discovery data.
- * Runs the same pipeline as network discovery: ping, reverse DNS, ARP, ports, vendor, OS.
- * @param {string} ip - Host IP to probe
- * @returns {Object} Enriched host data
+ * Shared logic to enrich a host with details like OS, hostname, mac, vendor, ports
+ * @param {string} ip - IP address to enrich
+ * @param {Object} options - Options context containing optional pre-fetched data (like arpTable)
+ * @returns {Object} Extracted network data for the host
  */
-export async function probeHost(ip) {
+export async function enrichHost(ip, options = {}) {
   const result = { ip };
-
-  // Ping
-  try {
-    const pingRes = await ping.promise.probe(ip, { timeout: 2 });
-    result.alive = pingRes.alive;
-    result.pingTime = pingRes.time;
-  } catch {
-    result.alive = false;
-  }
 
   // Reverse DNS
   try {
@@ -334,11 +325,11 @@ export async function probeHost(ip) {
     if (hostnames && hostnames.length > 0) result.hostname = hostnames[0];
   } catch {}
 
-  // ARP table for MAC
+  // ARP & Vendor
   try {
-    const arpTable = await getArpTable();
-    if (arpTable[ip]) {
-      result.mac = arpTable[ip];
+    const table = options.arpTable || await getArpTable();
+    if (table[ip]) {
+      result.mac = table[ip];
       result.vendor = await getVendorFromMac(result.mac);
     }
   } catch {}
@@ -354,4 +345,25 @@ export async function probeHost(ip) {
   result.os = guessOS(result.ports || [], result.vendor || 'Unknown');
 
   return result;
+}
+
+/**
+ * Probe a single host to enrich it with discovery data.
+ * Runs the same pipeline as network discovery: ping, reverse DNS, ARP, ports, vendor, OS.
+ * @param {string} ip - Host IP to probe
+ * @returns {Object} Enriched host data
+ */
+export async function probeHost(ip) {
+  let pingData = { alive: false };
+
+  // Ping
+  try {
+    const pingRes = await ping.promise.probe(ip, { timeout: 2 });
+    pingData.alive = pingRes.alive;
+    pingData.pingTime = pingRes.time;
+  } catch {}
+
+  // Enhance
+  const enriched = await enrichHost(ip);
+  return { ...enriched, ...pingData };
 }

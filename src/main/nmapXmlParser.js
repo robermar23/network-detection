@@ -1,24 +1,40 @@
 import fs from 'fs';
+import { XMLParser } from 'fast-xml-parser';
 
 /**
  * Parse an Nmap XML output file and extract host data.
- * Uses regex-based parsing to avoid external XML dependencies.
  * 
  * @param {string} filePath - Absolute path to the Nmap XML file
  * @returns {Array<Object>} Array of host objects compatible with state.hosts
  */
 export function parseNmapXml(filePath) {
   const xml = fs.readFileSync(filePath, 'utf8');
+  
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '@_',
+    allowBooleanAttributes: true,
+    isArray: (name, jpath, isLeafNode, isAttribute) => { 
+      const arrayNodes = ['nmaprun.host', 'nmaprun.host.ports.port', 'nmaprun.host.address', 'nmaprun.host.hostnames.hostname', 'nmaprun.host.os.osmatch'];
+      return arrayNodes.indexOf(jpath) !== -1;
+    }
+  });
+
+  let jsonObj;
+  try {
+    jsonObj = parser.parse(xml);
+  } catch (err) {
+    console.error('Failed to parse Nmap XML:', err);
+    return [];
+  }
+
   const hosts = [];
+  const nmaprun = jsonObj.nmaprun;
+  if (!nmaprun || !nmaprun.host) return hosts;
 
-  // Split into <host>...</host> blocks
-  const hostBlocks = xml.match(/<host[^>]*>[\s\S]*?<\/host>/gi);
-  if (!hostBlocks) return hosts;
-
-  for (const block of hostBlocks) {
+  for (const h of nmaprun.host) {
     // Skip hosts that are "down"
-    const statusMatch = block.match(/<status\s+state="([^"]+)"/i);
-    if (statusMatch && statusMatch[1].toLowerCase() === 'down') continue;
+    if (h.status && h.status['@_state'] && h.status['@_state'].toLowerCase() === 'down') continue;
 
     const host = {
       source: 'nmap-import',
@@ -27,69 +43,57 @@ export function parseNmapXml(filePath) {
       nmapData: null
     };
 
-    // Extract IP address
-    const ipMatch = block.match(/<address\s+addr="([^"]+)"\s+addrtype="ipv4"/i);
-    if (ipMatch) {
-      host.ip = ipMatch[1];
-    } else {
-      // Try IPv6
-      const ip6Match = block.match(/<address\s+addr="([^"]+)"\s+addrtype="ipv6"/i);
-      if (ip6Match) host.ip = ip6Match[1];
+    // Extract addresses (IP, MAC)
+    let addresses = h.address || [];
+    if (!Array.isArray(addresses)) addresses = [addresses];
+
+    for (const addr of addresses) {
+      if (addr['@_addrtype'] === 'ipv4' || addr['@_addrtype'] === 'ipv6') {
+        if (!host.ip) host.ip = addr['@_addr']; // Prioritize first found IP
+      } else if (addr['@_addrtype'] === 'mac') {
+        host.mac = addr['@_addr'];
+        if (addr['@_vendor']) host.vendor = addr['@_vendor'];
+      }
     }
 
-    if (!host.ip) continue; // Skip hosts without an IP
-
-    // Extract MAC address  
-    const macMatch = block.match(/<address\s+addr="([^"]+)"\s+addrtype="mac"(?:\s+vendor="([^"]*)")?/i);
-    if (macMatch) {
-      host.mac = macMatch[1];
-      if (macMatch[2]) host.vendor = macMatch[2];
-    }
+    if (!host.ip) continue;
 
     // Extract hostname
-    const hostnameMatch = block.match(/<hostname\s+name="([^"]+)"/i);
-    if (hostnameMatch) {
-      host.hostname = hostnameMatch[1];
+    let hostnames = h.hostnames?.hostname || [];
+    if (!Array.isArray(hostnames)) hostnames = [hostnames];
+    if (hostnames.length > 0 && hostnames[0]['@_name']) {
+        host.hostname = hostnames[0]['@_name'];
     }
 
     // Extract OS
-    const osMatch = block.match(/<osmatch\s+name="([^"]+)"/i);
-    if (osMatch) {
-      host.os = osMatch[1].substring(0, 50);
+    let osmatches = h.os?.osmatch || [];
+    if (!Array.isArray(osmatches)) osmatches = [osmatches];
+    if (osmatches.length > 0 && osmatches[0]['@_name']) {
+       host.os = osmatches[0]['@_name'].substring(0, 50);
     }
 
-    // Extract open ports
-    const portBlocks = block.match(/<port[^>]*>[\s\S]*?<\/port>/gi);
-    if (portBlocks) {
-      const portDetails = [];
-      for (const portBlock of portBlocks) {
-        const stateMatch = portBlock.match(/<state\s+state="([^"]+)"/i);
-        if (!stateMatch || stateMatch[1] !== 'open') continue;
+    // Extract Ports
+    let xmlPorts = h.ports?.port || [];
+    if (!Array.isArray(xmlPorts)) xmlPorts = [xmlPorts];
+    const portDetails = [];
 
-        const portIdMatch = portBlock.match(/portid="(\d+)"/i);
-        const protocolMatch = portBlock.match(/protocol="([^"]+)"/i);
-        const serviceMatch = portBlock.match(/<service\s+name="([^"]+)"/i);
-        const productMatch = portBlock.match(/product="([^"]+)"/i);
-        const versionMatch = portBlock.match(/version="([^"]+)"/i);
-
-        if (portIdMatch) {
-          const portNum = parseInt(portIdMatch[1], 10);
+    for (const p of xmlPorts) {
+       if (p.state && p.state['@_state'] === 'open' && p['@_portid']) {
+          const portNum = parseInt(p['@_portid'], 10);
           host.ports.push(portNum);
 
           portDetails.push({
-            port: portNum,
-            protocol: protocolMatch ? protocolMatch[1] : 'tcp',
-            service: serviceMatch ? serviceMatch[1] : 'unknown',
-            product: productMatch ? productMatch[1] : '',
-            version: versionMatch ? versionMatch[1] : ''
+             port: portNum,
+             protocol: p['@_protocol'] || 'tcp',
+             service: p.service ? (p.service['@_name'] || 'unknown') : 'unknown',
+             product: p.service ? (p.service['@_product'] || '') : '',
+             version: p.service ? (p.service['@_version'] || '') : ''
           });
-        }
-      }
+       }
+    }
 
-      // Store raw port details in nmapData for deep inspection
-      if (portDetails.length > 0) {
-        host.nmapData = { importedPorts: portDetails };
-      }
+    if (portDetails.length > 0) {
+       host.nmapData = { importedPorts: portDetails };
     }
 
     host.ports.sort((a, b) => a - b);

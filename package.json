@@ -100,7 +100,7 @@
       ]
     },
     "appImage": {
-      "license": "MIT"
+      "license": "LICENSE"
     },
     "publish": [
       {

@@ -46,16 +46,11 @@
         </div>
 
         <div class="control-group">
-          <select id="interface-select" class="dropdown-select" disabled>
-            <option value="">Loading interfaces...</option>
-          </select>
-          <button id="btn-refresh-interfaces" class="btn secondary icon-only" title="Refresh Interfaces">🔄</button>
-          <div class="divider"></div>
-          <button id="btn-scan" class="btn primary" disabled>
-            <span class="icon">🔍</span> Scan Network
+          <button id="btn-add-hosts" class="btn primary">
+            <span class="icon">＋</span> Add Hosts
           </button>
-          <button id="btn-stop" class="btn danger" disabled>
-            <span class="icon">🛑</span> Stop
+          <button id="btn-blacklist" class="btn secondary" title="Manage Out-of-Scope Blacklist">
+            <span class="icon">🛡️</span> Blacklist
           </button>
           <div class="divider"></div>
           <button id="btn-save" class="btn secondary">Save</button>
@@ -88,9 +83,30 @@
         </div>
 
         <div class="action-group" style="display: flex; gap: 12px; align-items: center;">
-          <button id="btn-deep-scan-all" class="btn info" style="display: none;">
-            <span class="icon">⚡</span> Deep Scan All
-          </button>
+          <div id="scan-all-group" class="scan-all-group" style="display: none;">
+            <button id="btn-deep-scan-all" class="btn info scan-all-main"
+              title="Run selected scan type against all visible hosts">
+              <span class="icon">⚡</span> <span id="scan-all-label">Deep Scan All</span>
+            </button>
+            <button id="btn-scan-all-menu" class="btn info scan-all-toggle" title="Choose scan type">▾</button>
+            <div id="scan-all-dropdown" class="scan-all-dropdown hidden">
+              <button class="scan-all-option active" data-scan-type="native" data-label="Deep Scan All">
+                <span class="icon">⚡</span> Native Deep Scan
+              </button>
+              <button class="scan-all-option nmap-only" data-scan-type="nmap-host" data-label="Nmap Host Scan All"
+                style="display: none;">
+                <span class="icon">🖥️</span> Nmap Host Scan
+              </button>
+              <button class="scan-all-option nmap-only" data-scan-type="nmap-vuln" data-label="Nmap Vuln Scan All"
+                style="display: none;">
+                <span class="icon">🛡️</span> Nmap Vuln Scan
+              </button>
+              <button class="scan-all-option nmap-only" data-scan-type="nmap-deep" data-label="Nmap Deep Scan All"
+                style="display: none;">
+                <span class="icon">☢️</span> Nmap Deep Scan
+              </button>
+            </div>
+          </div>
           <div class="divider"></div>
           <div class="view-toggles"
             style="display: flex; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 2px; border: 1px solid var(--border-glass);">
@@ -137,7 +153,10 @@
         <div id="empty-state" class="empty-state">
           <div class="pulse-ring"></div>
           <h2>No Hosts Detected</h2>
-          <p>Click "Scan Network" to begin discovering devices</p>
+          <p>Add hosts to begin working</p>
+          <button id="btn-add-hosts-cta" class="btn primary cta-btn">
+            <span class="icon">＋</span> Add Hosts
+          </button>
         </div>
       </main>
 
@@ -147,7 +166,10 @@
       <!-- Host Details Side Panel -->
       <aside id="details-panel" class="details-panel glass-panel">
         <div class="details-header">
-          <h2>Host Details</h2>
+          <div class="details-header-info">
+            <h2>Host Details</h2>
+            <span id="dp-header-ip" class="details-header-ip"></span>
+          </div>
           <button id="btn-close-details" class="btn icon-only">✕</button>
         </div>
         <div class="details-content" id="details-content">
@@ -156,6 +178,130 @@
       </aside>
     </div> <!-- End Split View Container -->
 
+  </div>
+
+  <!-- Host Acquisition Modal -->
+  <div id="scope-modal-overlay" class="modal-overlay hidden">
+    <div class="modal-content scope-modal">
+      <div class="modal-header">
+        <h2>🎯 Add Hosts to Scope</h2>
+        <button id="btn-close-scope-modal" class="btn icon-only modal-close">✕</button>
+      </div>
+      <div class="modal-tabs">
+        <button class="modal-tab active" data-tab="discover">🔍 Discover</button>
+        <button class="modal-tab" data-tab="manual">✏️ Manual</button>
+        <button class="modal-tab" data-tab="import-file">📄 Import File</button>
+        <button class="modal-tab" data-tab="import-nmap">📥 Nmap XML</button>
+      </div>
+      <div class="modal-body">
+        <!-- Tab: Network Discovery -->
+        <div class="tab-pane active" id="tab-discover">
+          <p class="tab-description">Discover hosts on your local network by scanning a network interface.</p>
+          <div class="form-group">
+            <label class="form-label">Network Interface</label>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <select id="interface-select" class="dropdown-select" style="flex:1;" disabled>
+                <option value="">Loading interfaces...</option>
+              </select>
+              <button id="btn-refresh-interfaces" class="btn secondary icon-only" title="Refresh">🔄</button>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:12px;">
+            <button id="btn-scan" class="btn primary" style="flex:1;" disabled>
+              <span class="icon">🔍</span> Scan Network
+            </button>
+            <button id="btn-stop" class="btn danger" disabled>
+              <span class="icon">🛑</span> Stop
+            </button>
+          </div>
+          <div id="discover-status" class="discover-status"
+            style="margin-top:12px; font-size:13px; color:var(--text-muted);"></div>
+          <div id="discover-pending-list" class="pending-host-list"></div>
+        </div>
+
+        <!-- Tab: Manual Entry -->
+        <div class="tab-pane" id="tab-manual">
+          <p class="tab-description">Manually add a host by IP address, hostname, or MAC address.</p>
+          <div class="form-group">
+            <label class="form-label">IP Address *</label>
+            <input type="text" id="manual-ip" class="text-input full-width"
+              placeholder="e.g. 192.168.1.50 or 10.0.0.0/24">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Hostname</label>
+            <input type="text" id="manual-hostname" class="text-input full-width" placeholder="e.g. srv-db-01.local">
+          </div>
+          <div class="form-group">
+            <label class="form-label">MAC Address</label>
+            <input type="text" id="manual-mac" class="text-input full-width" placeholder="e.g. 00:1B:44:11:3A:B7">
+          </div>
+          <button id="btn-manual-add" class="btn info full-width" style="margin-top:8px;">
+            <span class="icon">＋</span> Add to Staging List
+          </button>
+          <div id="manual-pending-list" class="pending-host-list"></div>
+        </div>
+
+        <!-- Tab: Import File -->
+        <div class="tab-pane" id="tab-import-file">
+          <p class="tab-description">Import a <code>.txt</code> or <code>.csv</code> file containing IP addresses, CIDR
+            ranges, or hostnames (one per line).</p>
+          <button id="btn-browse-scope" class="btn info full-width">
+            <span class="icon">📂</span> Browse for Scope File...
+          </button>
+          <div id="import-file-status" class="import-status"></div>
+          <div id="import-file-pending-list" class="pending-host-list"></div>
+        </div>
+
+        <!-- Tab: Import Nmap XML -->
+        <div class="tab-pane" id="tab-import-nmap">
+          <p class="tab-description">Import an Nmap XML output file (<code>-oX</code>) to load previously scanned hosts
+            with enriched metadata.</p>
+          <button id="btn-browse-nmap" class="btn info full-width">
+            <span class="icon">📂</span> Browse for Nmap XML...
+          </button>
+          <div id="import-nmap-status" class="import-status"></div>
+          <div id="import-nmap-pending-list" class="pending-host-list"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <span id="scope-pending-count" class="pending-count">0 hosts staged</span>
+        <div style="display:flex; gap:8px;">
+          <button id="btn-scope-cancel" class="btn secondary">Cancel</button>
+          <button id="btn-scope-commit" class="btn primary" disabled>
+            <span class="icon">✅</span> Add to Dashboard
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Blacklist Modal -->
+  <div id="blacklist-modal-overlay" class="modal-overlay hidden">
+    <div class="modal-content blacklist-modal">
+      <div class="modal-header">
+        <h2>🛡️ Out-of-Scope Blacklist</h2>
+        <button id="btn-close-blacklist-modal" class="btn icon-only modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="tab-description">Define IP addresses, CIDR ranges, or MAC addresses that must never be scanned or
+          displayed. Blacklisted hosts are hidden from the dashboard and excluded from all scan operations.</p>
+        <div class="form-group">
+          <label class="form-label">Add Entry</label>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="blacklist-input" class="text-input" style="flex:1;"
+              placeholder="IP, CIDR, or MAC...">
+            <button id="btn-blacklist-add" class="btn info">
+              <span class="icon">＋</span> Add
+            </button>
+          </div>
+        </div>
+        <div id="blacklist-entries" class="blacklist-entries"></div>
+      </div>
+      <div class="modal-footer">
+        <span id="blacklist-count" class="pending-count">0 entries</span>
+        <button id="btn-blacklist-done" class="btn primary">Done</button>
+      </div>
+    </div>
   </div>
 
   <!-- Render Logic -->

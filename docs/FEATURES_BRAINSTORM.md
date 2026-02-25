@@ -141,6 +141,62 @@ This is Burp Suite's primary commercial value. Each vulnerability class requires
 
 ---
 
+## 🧩 8. Architecture Recommendation: Single App, Multi-Workspace UI
+
+### Decision: One Unified Application
+
+Rather than splitting NetSpecter into two separate products (e.g., "NetSpecter" for network scanning + "AppSpecter" for web app testing), the recommended approach is a **single Electron application with a workspace-based UI switcher**.
+
+### Rationale
+
+**The Pivot Workflow.** In a real engagement, the analyst's workflow constantly crosses layer boundaries:
+
+1. Discover a host with open port `8080` in the **Network** workspace (L3/L4)
+2. Immediately pivot to the **Web App** workspace to launch an intercepting proxy against that host's web application (L7)
+3. Find a SQLi vulnerability, pivot back to **Network** to check what other ports are open for lateral movement
+
+If these are separate applications, the user constantly has to copy and paste IPs and loses context between two windows. That friction destroys the unified value proposition that makes NetSpecter unique.
+
+### Proposed UI Structure
+
+```
+┌──────────────────────────────────────────────────────┐
+│  🌐 Network    🕷️ Web App    🔧 Utilities           │  ← Top-level workspace switcher
+├──────────────────────────────────────────────────────┤
+│                                                      │
+│   (Completely different UI per workspace)             │
+│                                                      │
+│   Network:  Host grid, port cards, topology map      │
+│   Web App:  HTTP history, proxy intercept, repeater  │
+│   Utilities: Decoder, Comparer, Sequencer            │
+│                                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+Each workspace swaps the entire UI context, but the **data layer remains shared**:
+
+- A host discovered in Network mode is immediately available as a target in Web App mode
+- Vulnerability findings from both layers aggregate into one unified report
+- One shared SQLite database backs all scan results, HTTP history, and engagement data
+
+### Architecture Benefits
+
+| Concern | Single App | Two Separate Apps |
+|---|---|---|
+| **Data Sharing** | Hosts, vulns, and scan results in one shared store | Requires IPC bridge, file import/export, or shared DB |
+| **Pivot Speed** | Right-click host → "Open in Web Scanner" instantly | Alt-Tab, copy IP, paste into second app |
+| **Install & Updates** | One installer, one auto-update cycle | Two apps to install, version, and update independently |
+| **Design System** | Shared glassmorphic CSS, same component library | Duplicated UI work or a shared npm package |
+| **IPC Layer** | Existing `ipc.js` channel system naturally extends | Separate preload scripts, separate channel registries |
+| **Codebase Complexity** | Modular workspaces within one `src/renderer/` | Two full Electron apps with duplicated boilerplate |
+| **Brand Positioning** | "NetSpecter covers L3–L7" — stronger market story | Fragmented product identity |
+
+### When Separate Apps Would Make Sense
+
+The only scenario justifying a split would be **separate commercial licensing** (e.g., selling a "Network Edition" and a "Professional Edition" independently). Since NetSpecter is open-source MIT, a unified application maximizes value for the community.
+
+---
+
 ## 📋 Summary of Value Proposition
 
-By implementing these features, **NetSpecter** transitions from a simple *discovery* scanner into a **comprehensive Network Operations and Security Auditing Platform**. Combined with Burp Suite-class web application testing, it would allow engineers to completely replace disjointed CLI tools (Nmap, Nikto, DirBuster, Wireshark, SNMPwalk, Burp, ffuf, sqlmap) with a single, visually appealing, and highly efficient desktop application spanning both **network-layer** and **application-layer** security testing.
+By implementing these features, **NetSpecter** transitions from a simple *discovery* scanner into a **comprehensive Network Operations and Security Auditing Platform**. Combined with Burp Suite-class web application testing under a single multi-workspace UI, it would allow engineers to completely replace disjointed CLI tools (Nmap, Nikto, DirBuster, Wireshark, SNMPwalk, Burp, ffuf, sqlmap) with a single, visually appealing, and highly efficient desktop application spanning both **network-layer** and **application-layer** security testing.

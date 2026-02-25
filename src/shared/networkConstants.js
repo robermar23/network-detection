@@ -62,3 +62,38 @@ export const vendorMap = {
 export const COMMON_PORTS = [
   21, 22, 23, 25, 53, 80, 110, 111, 135, 139, 143, 443, 445, 548, 993, 995, 1723, 3306, 3389, 5900, 8080
 ];
+
+export const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+
+/**
+ * Expand a CIDR notation string into an array of individual IP addresses.
+ * Supports /16 through /32. Caps at 65536 addresses for safety.
+ * @param {string} cidr - e.g. "192.168.1.0/24"
+ * @returns {string[]} Array of IP address strings
+ */
+export function expandCIDR(cidr) {
+  const parts = cidr.trim().split('/');
+  if (parts.length !== 2) return [];
+
+  const ipParts = parts[0].split('.').map(Number);
+  const prefix = parseInt(parts[1], 10);
+
+  if (ipParts.length !== 4 || ipParts.some(p => isNaN(p) || p < 0 || p > 255)) return [];
+  if (isNaN(prefix) || prefix < 16 || prefix > 32) return [];
+
+  const ipNum = ((ipParts[0] << 24) | (ipParts[1] << 16) | (ipParts[2] << 8) | ipParts[3]) >>> 0;
+  const hostBits = 32 - prefix;
+  const totalHosts = 1 << hostBits;
+  const networkAddr = (ipNum >>> hostBits) << hostBits >>> 0;
+
+  const ips = [];
+  // Skip network address (first) and broadcast (last) for ranges > /31
+  const start = prefix < 31 ? 1 : 0;
+  const end = prefix < 31 ? totalHosts - 1 : totalHosts;
+
+  for (let i = start; i < end && ips.length < 65536; i++) {
+    const addr = (networkAddr + i) >>> 0;
+    ips.push(`${(addr >>> 24) & 0xFF}.${(addr >>> 16) & 0xFF}.${(addr >>> 8) & 0xFF}.${addr & 0xFF}`);
+  }
+  return ips;
+}

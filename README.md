@@ -87,7 +87,7 @@ sudo apt install libfuse2
 ---
 
 ## 📖 Complete Documentation
-For a comprehensive breakdown of exactly how to use each feature, step-by-step UI breakdowns, and advanced Nmap exploitation techniques, please read the [Getting Started Guide](getting-started-guide.md).
+For a comprehensive breakdown of exactly how to use each feature, step-by-step UI breakdowns, and advanced Nmap exploitation techniques, please read the [Getting Started Guide](docs/getting-started-guide.md).
 
 ---
 

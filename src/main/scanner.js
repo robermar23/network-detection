@@ -309,3 +309,61 @@ export async function startNetworkScan(subnet, onHostFoundCallback, onCompleteCa
 export function stopNetworkScan() {
   scanActive = false;
 }
+
+/**
+ * Shared logic to enrich a host with details like OS, hostname, mac, vendor, ports
+ * @param {string} ip - IP address to enrich
+ * @param {Object} options - Options context containing optional pre-fetched data (like arpTable)
+ * @returns {Object} Extracted network data for the host
+ */
+export async function enrichHost(ip, options = {}) {
+  const result = { ip };
+
+  // Reverse DNS
+  try {
+    const hostnames = await dnsPromises.reverse(ip);
+    if (hostnames && hostnames.length > 0) result.hostname = hostnames[0];
+  } catch {}
+
+  // ARP & Vendor
+  try {
+    const table = options.arpTable || await getArpTable();
+    if (table[ip]) {
+      result.mac = table[ip];
+      result.vendor = await getVendorFromMac(result.mac);
+    }
+  } catch {}
+
+  // Port scan
+  try {
+    result.ports = await scanPorts(ip);
+  } catch {
+    result.ports = [];
+  }
+
+  // OS guess
+  result.os = guessOS(result.ports || [], result.vendor || 'Unknown');
+
+  return result;
+}
+
+/**
+ * Probe a single host to enrich it with discovery data.
+ * Runs the same pipeline as network discovery: ping, reverse DNS, ARP, ports, vendor, OS.
+ * @param {string} ip - Host IP to probe
+ * @returns {Object} Enriched host data
+ */
+export async function probeHost(ip) {
+  let pingData = { alive: false };
+
+  // Ping
+  try {
+    const pingRes = await ping.promise.probe(ip, { timeout: 2 });
+    pingData.alive = pingRes.alive;
+    pingData.pingTime = pingRes.time;
+  } catch {}
+
+  // Enhance
+  const enriched = await enrichHost(ip);
+  return { ...enriched, ...pingData };
+}

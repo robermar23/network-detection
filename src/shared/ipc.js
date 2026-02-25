@@ -33,5 +33,11 @@ export const IPC_CHANNELS = {
   RUN_NCAT: 'run-ncat',
   NMAP_SCAN_RESULT: 'nmap-scan-result',
   NMAP_SCAN_COMPLETE: 'nmap-scan-complete',
-  NMAP_SCAN_ERROR: 'nmap-scan-error'
+  NMAP_SCAN_ERROR: 'nmap-scan-error',
+
+  // Target Scope Management
+  IMPORT_SCOPE_FILE: 'import-scope-file',
+  IMPORT_NMAP_XML: 'import-nmap-xml',
+  PING_HOST: 'ping-host',
+  PROBE_HOST: 'probe-host'
 };

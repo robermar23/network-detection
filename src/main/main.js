@@ -2,9 +2,12 @@ import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
 import pkg from 'electron-updater';
 const { autoUpdater } = pkg;
 import { IPC_CHANNELS } from '#shared/ipc.js';
+import { expandCIDR } from '#shared/networkConstants.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import dns from 'dns';
+const dnsPromises = dns.promises;
 import { spawn, exec } from 'child_process';
 
 // --- Linux Root/Sandbox Detection ---
@@ -16,10 +19,13 @@ if (process.platform === 'linux' && process.getuid && process.getuid() === 0) {
   console.warn('[NetSpecter] Running as root — Chromium sandbox disabled via --no-sandbox.');
 }
 
-import { startNetworkScan, stopNetworkScan, getNetworkInterfaces } from './scanner.js';
+import { startNetworkScan, stopNetworkScan, getNetworkInterfaces, probeHost } from './scanner.js';
 import { runDeepScan, cancelDeepScan } from './deepScanner.js';
 import { checkNmapInstalled, runNmapScan, cancelNmapScan, runNcat, getNmapScripts } from './nmapScanner.js';
 import { createMainWindow } from './windowManager.js';
+import { parseNmapXml } from './nmapXmlParser.js';
+import { expandCIDR } from '#shared/networkConstants.js';
+import ping from 'ping';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -267,4 +273,125 @@ ipcMain.handle(IPC_CHANNELS.CLEAR_RESULTS, async (event) => {
 
 ipcMain.on(IPC_CHANNELS.EXIT_APP, () => {
   app.quit();
+});
+
+// --- Target Scope Management ---
+
+ipcMain.handle(IPC_CHANNELS.IMPORT_SCOPE_FILE, async () => {
+  try {
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import Scope File',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Scope Files', extensions: ['txt', 'csv', 'tsv'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+
+    if (canceled || filePaths.length === 0) return { status: 'cancelled' };
+
+    const content = await fs.promises.readFile(filePaths[0], 'utf8');
+    const lines = content.split(/[\\r\\n]+/).map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+    const hosts = [];
+    const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+    const cidrRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}\/[0-9]{1,2}$/;
+    const seen = new Set();
+
+    let processedCount = 0;
+
+    for (const line of lines) {
+      // Yield to event loop every 100 items to prevent UI freezes on massive scopes
+      if (++processedCount % 100 === 0) {
+        await new Promise(setImmediate);
+      }
+
+      // Handle CSV/TSV — take first column
+      const entry = line.split(/[,\\t]/)[0].trim();
+      if (!entry) continue;
+
+      if (cidrRegex.test(entry)) {
+        // Expand CIDR range
+        const expanded = expandCIDR(entry);
+        for (const ip of expanded) {
+          if (!seen.has(ip)) {
+            seen.add(ip);
+            hosts.push({ ip, source: 'imported', hostname: '', mac: '', vendor: '', os: '' });
+          }
+        }
+      } else if (ipRegex.test(entry)) {
+        if (!seen.has(entry)) {
+          seen.add(entry);
+          hosts.push({ ip: entry, source: 'imported', hostname: '', mac: '', vendor: '', os: '' });
+        }
+      } else {
+        // Treat as hostname, attempt DNS lookup
+        try {
+           const lookupResult = await dnsPromises.lookup(entry, { family: 4 });
+           if (lookupResult && lookupResult.address) {
+             const resolvedIp = lookupResult.address;
+             if (!seen.has(resolvedIp)) {
+                seen.add(resolvedIp);
+                hosts.push({ ip: resolvedIp, source: 'imported', hostname: entry, mac: '', vendor: '', os: '' });
+             }
+           }
+        } catch (err) {
+           console.warn(`Failed to resolve imported hostname ${entry}:`, err.message);
+        }
+      }
+    }
+
+    console.log(`Scope import: parsed ${hosts.length} hosts from ${filePaths[0]}`);
+    return { status: 'imported', hosts, path: filePaths[0] };
+  } catch (e) {
+    console.error('Scope import failed:', e);
+    return { status: 'error', error: e.message };
+  }
+});
+
+ipcMain.handle(IPC_CHANNELS.IMPORT_NMAP_XML, async () => {
+  try {
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import Nmap XML',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Nmap XML Files', extensions: ['xml'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+
+    if (canceled || filePaths.length === 0) return { status: 'cancelled' };
+
+    const hosts = parseNmapXml(filePaths[0]);
+    console.log(`Nmap XML import: parsed ${hosts.length} hosts from ${filePaths[0]}`);
+    return { status: 'imported', hosts, path: filePaths[0] };
+  } catch (e) {
+    console.error('Nmap XML import failed:', e);
+    return { status: 'error', error: e.message };
+  }
+});
+
+ipcMain.handle(IPC_CHANNELS.PING_HOST, async (event, ip) => {
+  try {
+    const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+    if (!ip || !ipRegex.test(ip)) {
+      return { alive: false, time: null, error: 'Invalid IP format' };
+    }
+    const res = await ping.promise.probe(ip, { timeout: 2 });
+    return { alive: res.alive, time: res.time };
+  } catch (e) {
+    return { alive: false, time: null, error: e.message };
+  }
+});
+
+ipcMain.handle(IPC_CHANNELS.PROBE_HOST, async (event, ip) => {
+  try {
+    const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+    if (!ip || !ipRegex.test(ip)) {
+      return { error: 'Invalid IP format' };
+    }
+    const result = await probeHost(ip);
+    return result;
+  } catch (e) {
+    return { ip, error: e.message, alive: false };
+  }
 });

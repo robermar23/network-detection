@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.2](https://github.com/robermar23/netspectre/compare/v1.4.1...v1.4.2) (2026-02-25)
+
+
+### Bug Fixes
+
+* ref to license file was wrong ([80ed80b](https://github.com/robermar23/netspectre/commit/80ed80be64420c2c447d6c2b5c3673a2cc004894))
+
 ## [1.4.1](https://github.com/robermar23/netspectre/compare/v1.4.0...v1.4.1) (2026-02-24)
 
 

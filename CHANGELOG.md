@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.5.0](https://github.com/robermar23/netspectre/compare/v1.4.3...v1.5.0) (2026-02-25)
+
+
+### Features
+
+* adjust status indicator placement and fix adding by subnet ([9de8d42](https://github.com/robermar23/netspectre/commit/9de8d423cb6d765f87580b9ef4d90777a8825cb2))
+* allow nmap scan all from dashboard ([07a36a0](https://github.com/robermar23/netspectre/commit/07a36a012b06814413e159053e793c1409a20b54))
+* Introduce Nmap XML parsing and a scan orchestrator to enable comprehensive network deep scanning. ([71f3537](https://github.com/robermar23/netspectre/commit/71f3537a661a1118505eb40ebab626854057719e))
+
 ## [1.4.3](https://github.com/robermar23/netspectre/compare/v1.4.2...v1.4.3) (2026-02-25)
 
 

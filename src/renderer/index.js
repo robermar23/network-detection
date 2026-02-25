@@ -21,6 +21,10 @@ api.checkNmap().then(async (installed) => {
   } else {
     state.nmapScripts = await api.getNmapScripts();
     console.log(`Loaded ${state.nmapScripts.length} native Nmap scripts from backend.`);
+    // Reveal Nmap scan-all options
+    document.querySelectorAll('.scan-all-option.nmap-only').forEach(el => {
+      el.style.display = 'flex';
+    });
   }
 });
 
@@ -1056,10 +1060,10 @@ function renderAllHosts() {
   elements.resultCountText.innerText = `Showing ${filteredHosts.length} of ${state.hosts.length} hosts`;
   
   if (filteredHosts.length > 0) {
-    elements.btnDeepScanAll.style.display = 'inline-flex';
+    elements.scanAllGroup.style.display = 'inline-flex';
     elements.emptyState.classList.add('hidden');
   } else {
-    elements.btnDeepScanAll.style.display = 'none';
+    elements.scanAllGroup.style.display = 'none';
     if (state.hosts.length === 0) {
       elements.emptyState.classList.remove('hidden');
     } else {
@@ -1100,6 +1104,36 @@ function debouncedRenderAllHosts() {
   renderTimeout = setTimeout(() => renderAllHosts(), 100);
 }
 
+// --- Scan All Dropdown Logic ---
+let scanAllType = 'native'; // 'native' | 'nmap-host' | 'nmap-vuln' | 'nmap-deep'
+
+elements.btnScanAllMenu.addEventListener('click', (e) => {
+  e.stopPropagation();
+  elements.scanAllDropdown.classList.toggle('hidden');
+});
+
+// Close dropdown when clicking elsewhere
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.scan-all-group')) {
+    elements.scanAllDropdown.classList.add('hidden');
+  }
+});
+
+// Handle option selection
+document.querySelectorAll('.scan-all-option').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('.scan-all-option').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+    scanAllType = opt.getAttribute('data-scan-type');
+    const label = opt.getAttribute('data-label');
+    elements.scanAllLabel.textContent = label;
+    // Update the main button icon
+    const iconMap = { native: '⚡', 'nmap-host': '🖥️', 'nmap-vuln': '🛡️', 'nmap-deep': '☢️' };
+    elements.btnDeepScanAll.querySelector('.icon').textContent = iconMap[scanAllType] || '⚡';
+    elements.scanAllDropdown.classList.add('hidden');
+  });
+});
+
 // Deep Scan All UI
 let isDeepScanningAll = false;
 let deepScanAllQueue = [];
@@ -1120,7 +1154,8 @@ function updateDeepScanAllProgress() {
     const currentProgressTotal = (deepScanAllCompleted * 100) + activePercentageSum;
     totalPercentageVal = Math.round((currentProgressTotal / totalMaxProgress) * 100);
   }
-  elements.statusText.innerText = `Deep scanning: ${deepScanAllCompleted}/${deepScanAllTotal} hosts completed - ${totalPercentageVal}%`;
+  const scanLabel = scanAllType === 'native' ? 'Deep scanning' : `Nmap ${scanAllType.replace('nmap-', '')} scanning`;
+  elements.statusText.innerText = `${scanLabel}: ${deepScanAllCompleted}/${deepScanAllTotal} hosts completed - ${totalPercentageVal}%`;
 }
 
 function pumpDeepScanQueue() {
@@ -1128,29 +1163,48 @@ function pumpDeepScanQueue() {
   while (deepScanAllActive.size < 3 && deepScanAllQueue.length > 0) {
     const ip = deepScanAllQueue.shift();
     deepScanAllActive.add(ip);
-    const hostIdx = state.hosts.findIndex(h => h.ip === ip);
-    if (hostIdx >= 0) state.hosts[hostIdx].deepAudit = { history: [], vulnerabilities: 0, warnings: 0 };
-    
-    const btnRunDeepScan = document.getElementById('btn-run-deep-scan');
-    if (btnRunDeepScan && btnRunDeepScan.getAttribute('data-ip') === ip) {
-       btnRunDeepScan.setAttribute('data-scanning', 'true');
-       btnRunDeepScan.innerHTML = `<span class="icon">🛑</span> Cancel Scan...`;
+
+    if (scanAllType === 'native') {
+      // Native deep scan
+      const hostIdx = state.hosts.findIndex(h => h.ip === ip);
+      if (hostIdx >= 0) state.hosts[hostIdx].deepAudit = { history: [], vulnerabilities: 0, warnings: 0 };
+      
+      const btnRunDeepScan = document.getElementById('btn-run-deep-scan');
+      if (btnRunDeepScan && btnRunDeepScan.getAttribute('data-ip') === ip) {
+         btnRunDeepScan.setAttribute('data-scanning', 'true');
+         btnRunDeepScan.innerHTML = `<span class="icon">🛑</span> Cancel Scan...`;
+      }
+      api.runDeepScan(ip);
+    } else {
+      // Nmap scan type
+      const nmapType = scanAllType.replace('nmap-', ''); // 'host', 'vuln', 'deep'
+      api.runNmapScan(nmapType, ip);
     }
-    api.runDeepScan(ip);
   }
   if (deepScanAllQueue.length === 0 && deepScanAllActive.size === 0) {
     isDeepScanningAll = false;
-    elements.btnDeepScanAll.innerHTML = `<span class="icon">⚡</span> Deep Scan All`;
-    elements.statusText.innerText = `Deep scan all finished (${deepScanAllTotal} hosts).`;
+    const labelText = document.querySelector('.scan-all-option.active')?.getAttribute('data-label') || 'Deep Scan All';
+    const iconMap = { native: '⚡', 'nmap-host': '🖥️', 'nmap-vuln': '🛡️', 'nmap-deep': '☢️' };
+    elements.btnDeepScanAll.querySelector('.icon').textContent = iconMap[scanAllType] || '⚡';
+    elements.scanAllLabel.textContent = labelText;
+    elements.statusText.innerText = `Scan all finished (${deepScanAllTotal} hosts).`;
   } else updateDeepScanAllProgress();
 }
 
 elements.btnDeepScanAll.addEventListener('click', () => {
   if (isDeepScanningAll) {
     isDeepScanningAll = false;
-    for (const ip of deepScanAllActive) api.cancelDeepScan(ip);
+    for (const ip of deepScanAllActive) {
+      if (scanAllType === 'native') {
+        api.cancelDeepScan(ip);
+      } else {
+        api.cancelNmapScan(ip);
+      }
+    }
     deepScanAllActive.clear();
-    elements.btnDeepScanAll.innerHTML = `<span class="icon">⚡</span> Deep Scan All`;
+    const labelText = document.querySelector('.scan-all-option.active')?.getAttribute('data-label') || 'Deep Scan All';
+    elements.scanAllLabel.textContent = labelText;
+    elements.btnDeepScanAll.querySelector('.icon').textContent = { native: '⚡', 'nmap-host': '🖥️', 'nmap-vuln': '🛡️', 'nmap-deep': '☢️' }[scanAllType] || '⚡';
     return;
   }
   const filteredHosts = getFilteredAndSortedHosts();
@@ -1159,7 +1213,8 @@ elements.btnDeepScanAll.addEventListener('click', () => {
   deepScanAllQueue = filteredHosts.map(h => h.ip);
   deepScanAllTotal = deepScanAllQueue.length;
   deepScanAllCompleted = 0;
-  elements.btnDeepScanAll.innerHTML = `<span class="icon">🛑</span> Cancel Deep Scan All`;
+  elements.btnDeepScanAll.querySelector('.icon').textContent = '🛑';
+  elements.scanAllLabel.textContent = `Cancel (0/${deepScanAllTotal})`;
   pumpDeepScanQueue();
 });
 
@@ -1494,6 +1549,22 @@ if (window.electronAPI) {
          btn.innerHTML = `<span class="icon">🛑</span> Cancel ${label}... (${percent}%)`;
        }
     }
+
+    // Update scan-all status bar with per-host Nmap progress
+    if (isDeepScanningAll && scanAllType !== 'native') {
+      const ip = type === 'port' ? data.target.split(':')[0] : data.target;
+      if (deepScanAllActive.has(ip) && timingMatch) {
+        const pct = parseFloat(timingMatch[1]).toFixed(0);
+        deepScanHostProgress[ip] = parseFloat(timingMatch[1]);
+      }
+      // Build active hosts status
+      const activeList = [...deepScanAllActive].map(aip => {
+        const p = deepScanHostProgress[aip];
+        return p !== undefined ? `${aip} (${p.toFixed(0)}%)` : aip;
+      }).join(', ');
+      const scanLabel = `Nmap ${scanAllType.replace('nmap-', '')} scan`;
+      elements.statusText.innerText = `${scanLabel}: ${deepScanAllCompleted}/${deepScanAllTotal} done | Active: ${activeList}`;
+    }
     
     const bannerBlock = document.getElementById(`nmap-live-banner-${type}`);
     if (bannerBlock) {
@@ -1760,6 +1831,15 @@ if (window.electronAPI) {
         if (bannerBlock) bannerBlock.innerHTML += '\n\n[DISCONNECTED]';
       }
     }
+
+    // Scan-all queue: advance to next host if this was part of a batch nmap scan
+    if (isDeepScanningAll && scanAllType !== 'native' && deepScanAllActive.has(ip)) {
+      deepScanAllActive.delete(ip);
+      delete deepScanHostProgress[ip];
+      deepScanAllCompleted++;
+      elements.scanAllLabel.textContent = `Cancel (${deepScanAllCompleted}/${deepScanAllTotal})`;
+      pumpDeepScanQueue();
+    }
   });
 
   window.electronAPI.onNmapScanError && window.electronAPI.onNmapScanError((data) => {
@@ -1770,6 +1850,7 @@ if (window.electronAPI) {
     }
     
     const target = data.target;
+    const ip = type === 'port' ? target.split(':')[0] : target;
     const port = type === 'port' ? target.split(':')[1] : null;
     const btnIds = { 'deep': 'btn-nmap-deep', 'host': 'btn-nmap-host', 'vuln': 'btn-nmap-vuln', 'custom': 'btn-nmap-custom', 'port': `btn-nmap-port-${port}`, 'ncat': 'btn-run-ncat' };
     const btn = document.getElementById(btnIds[type]);
@@ -1777,6 +1858,15 @@ if (window.electronAPI) {
       btn.classList.remove('pulsing', 'danger-pulsing');
       btn.removeAttribute('data-scanning');
       btn.innerHTML = type === 'ncat' ? `<span class="icon">❌</span> Connection Failed` : `<span class="icon">❌</span> Scan Failed`;
+    }
+
+    // Scan-all queue: advance even on error
+    if (isDeepScanningAll && scanAllType !== 'native' && deepScanAllActive.has(ip)) {
+      deepScanAllActive.delete(ip);
+      delete deepScanHostProgress[ip];
+      deepScanAllCompleted++;
+      elements.scanAllLabel.textContent = `Cancel (${deepScanAllCompleted}/${deepScanAllTotal})`;
+      pumpDeepScanQueue();
     }
   });
 }

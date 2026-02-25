@@ -82,53 +82,54 @@
           <span class="subtitle" id="result-count-text">Showing 0 of 0 hosts</span>
         </div>
 
-        <div id="scan-all-group" class="scan-all-group" style="display: none;">
-          <button id="btn-deep-scan-all" class="btn info scan-all-main"
-            title="Run selected scan type against all visible hosts">
-            <span class="icon">⚡</span> <span id="scan-all-label">Deep Scan All</span>
-          </button>
-          <button id="btn-scan-all-menu" class="btn info scan-all-toggle" title="Choose scan type">▾</button>
-          <div id="scan-all-dropdown" class="scan-all-dropdown hidden">
-            <button class="scan-all-option active" data-scan-type="native" data-label="Deep Scan All">
-              <span class="icon">⚡</span> Native Deep Scan
+        <div class="action-group" style="display: flex; gap: 12px; align-items: center;">
+          <div id="scan-all-group" class="scan-all-group" style="display: none;">
+            <button id="btn-deep-scan-all" class="btn info scan-all-main"
+              title="Run selected scan type against all visible hosts">
+              <span class="icon">⚡</span> <span id="scan-all-label">Deep Scan All</span>
             </button>
-            <button class="scan-all-option nmap-only" data-scan-type="nmap-host" data-label="Nmap Host Scan All"
-              style="display: none;">
-              <span class="icon">🖥️</span> Nmap Host Scan
-            </button>
-            <button class="scan-all-option nmap-only" data-scan-type="nmap-vuln" data-label="Nmap Vuln Scan All"
-              style="display: none;">
-              <span class="icon">🛡️</span> Nmap Vuln Scan
-            </button>
-            <button class="scan-all-option nmap-only" data-scan-type="nmap-deep" data-label="Nmap Deep Scan All"
-              style="display: none;">
-              <span class="icon">☢️</span> Nmap Deep Scan
-            </button>
+            <button id="btn-scan-all-menu" class="btn info scan-all-toggle" title="Choose scan type">▾</button>
+            <div id="scan-all-dropdown" class="scan-all-dropdown hidden">
+              <button class="scan-all-option active" data-scan-type="native" data-label="Deep Scan All">
+                <span class="icon">⚡</span> Native Deep Scan
+              </button>
+              <button class="scan-all-option nmap-only" data-scan-type="nmap-host" data-label="Nmap Host Scan All"
+                style="display: none;">
+                <span class="icon">🖥️</span> Nmap Host Scan
+              </button>
+              <button class="scan-all-option nmap-only" data-scan-type="nmap-vuln" data-label="Nmap Vuln Scan All"
+                style="display: none;">
+                <span class="icon">🛡️</span> Nmap Vuln Scan
+              </button>
+              <button class="scan-all-option nmap-only" data-scan-type="nmap-deep" data-label="Nmap Deep Scan All"
+                style="display: none;">
+                <span class="icon">☢️</span> Nmap Deep Scan
+              </button>
+            </div>
+          </div>
+          <div class="divider"></div>
+          <div class="view-toggles"
+            style="display: flex; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 2px; border: 1px solid var(--border-glass);">
+            <button id="btn-view-grid" class="btn icon-only active" title="Grid View"
+              style="padding: 4px 8px; border-radius: 4px; box-shadow: none;">⏹️</button>
+            <button id="btn-view-list" class="btn icon-only" title="List View"
+              style="padding: 4px 8px; border-radius: 4px; box-shadow: none;">☰</button>
+            <button id="btn-view-table" class="btn icon-only" title="Table View"
+              style="padding: 4px 8px; border-radius: 4px; box-shadow: none;">🗄️</button>
           </div>
         </div>
-        <div class="divider"></div>
-        <div class="view-toggles"
-          style="display: flex; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 2px; border: 1px solid var(--border-glass);">
-          <button id="btn-view-grid" class="btn icon-only active" title="Grid View"
-            style="padding: 4px 8px; border-radius: 4px; box-shadow: none;">⏹️</button>
-          <button id="btn-view-list" class="btn icon-only" title="List View"
-            style="padding: 4px 8px; border-radius: 4px; box-shadow: none;">☰</button>
-          <button id="btn-view-table" class="btn icon-only" title="Table View"
-            style="padding: 4px 8px; border-radius: 4px; box-shadow: none;">🗄️</button>
-        </div>
       </div>
-  </div>
-  </header>
+    </header>
 
-  <!-- Split View Container -->
-  <div class="split-view-container" style="display: flex; flex-grow: 1; overflow: hidden; gap: 0;">
-    <!-- Dashboard Grid -->
-    <main class="dashboard-scroll" style="flex-grow: 1;">
-      <div id="host-grid" class="host-grid">
-        <!-- Dynamically populated Host Cards will go here -->
+    <!-- Split View Container -->
+    <div class="split-view-container" style="display: flex; flex-grow: 1; overflow: hidden; gap: 0;">
+      <!-- Dashboard Grid -->
+      <main class="dashboard-scroll" style="flex-grow: 1;">
+        <div id="host-grid" class="host-grid">
+          <!-- Dynamically populated Host Cards will go here -->
 
-        <!-- Example Card (Hidden by default, used as template structure conceptually) -->
-        <!--
+          <!-- Example Card (Hidden by default, used as template structure conceptually) -->
+          <!--
           <div class="host-card glass-panel">
             <div class="status-indicator online"></div>
             <div class="host-header">
@@ -146,36 +147,36 @@
           </div>
           -->
 
-      </div>
-
-      <!-- Empty State UI -->
-      <div id="empty-state" class="empty-state">
-        <div class="pulse-ring"></div>
-        <h2>No Hosts Detected</h2>
-        <p>Add hosts to begin working</p>
-        <button id="btn-add-hosts-cta" class="btn primary cta-btn">
-          <span class="icon">＋</span> Add Hosts
-        </button>
-      </div>
-    </main>
-
-    <!-- Resizer Handle -->
-    <div id="sidebar-resizer" class="resizer" style="display: none;"></div>
-
-    <!-- Host Details Side Panel -->
-    <aside id="details-panel" class="details-panel glass-panel">
-      <div class="details-header">
-        <div class="details-header-info">
-          <h2>Host Details</h2>
-          <span id="dp-header-ip" class="details-header-ip"></span>
         </div>
-        <button id="btn-close-details" class="btn icon-only">✕</button>
-      </div>
-      <div class="details-content" id="details-content">
-        <!-- Content injected dynamically -->
-      </div>
-    </aside>
-  </div> <!-- End Split View Container -->
+
+        <!-- Empty State UI -->
+        <div id="empty-state" class="empty-state">
+          <div class="pulse-ring"></div>
+          <h2>No Hosts Detected</h2>
+          <p>Add hosts to begin working</p>
+          <button id="btn-add-hosts-cta" class="btn primary cta-btn">
+            <span class="icon">＋</span> Add Hosts
+          </button>
+        </div>
+      </main>
+
+      <!-- Resizer Handle -->
+      <div id="sidebar-resizer" class="resizer" style="display: none;"></div>
+
+      <!-- Host Details Side Panel -->
+      <aside id="details-panel" class="details-panel glass-panel">
+        <div class="details-header">
+          <div class="details-header-info">
+            <h2>Host Details</h2>
+            <span id="dp-header-ip" class="details-header-ip"></span>
+          </div>
+          <button id="btn-close-details" class="btn icon-only">✕</button>
+        </div>
+        <div class="details-content" id="details-content">
+          <!-- Content injected dynamically -->
+        </div>
+      </aside>
+    </div> <!-- End Split View Container -->
 
   </div>
 

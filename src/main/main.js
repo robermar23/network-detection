@@ -6,6 +6,16 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { spawn, exec } from 'child_process';
+
+// --- Linux Root/Sandbox Detection ---
+// Chromium refuses to start with sandboxing when running as root (UID 0).
+// Network scanning tools are often launched with sudo on Linux,
+// so we defensively disable the sandbox in that case.
+if (process.platform === 'linux' && process.getuid && process.getuid() === 0) {
+  app.commandLine.appendSwitch('no-sandbox');
+  console.warn('[NetSpecter] Running as root — Chromium sandbox disabled via --no-sandbox.');
+}
+
 import { startNetworkScan, stopNetworkScan, getNetworkInterfaces } from './scanner.js';
 import { runDeepScan, cancelDeepScan } from './deepScanner.js';
 import { checkNmapInstalled, runNmapScan, cancelNmapScan, runNcat, getNmapScripts } from './nmapScanner.js';

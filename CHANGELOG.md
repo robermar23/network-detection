@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.4.2](https://github.com/robermar23/netspectre/compare/v1.4.1...v1.4.2) (2026-02-25)
+
+
+### Bug Fixes
+
+* ref to license file was wrong ([80ed80b](https://github.com/robermar23/netspectre/commit/80ed80be64420c2c447d6c2b5c3673a2cc004894))
+
+## [1.4.1](https://github.com/robermar23/netspectre/compare/v1.4.0...v1.4.1) (2026-02-24)
+
+
+### Bug Fixes
+
+* fix build error for deb ([997e729](https://github.com/robermar23/netspectre/commit/997e729c227d7bc09a98030eb499b61d8d1ffe71))
+
+## [1.4.0](https://github.com/robermar23/netspectre/compare/v1.3.1...v1.4.0) (2026-02-24)
+
+
+### Features
+
+* Implement main Electron process with network scanning, auto-upd… ([2537ecf](https://github.com/robermar23/netspectre/commit/2537ecfe8d62cf7453b9cf20eba775c1bb54f96a))
+* Implement main Electron process with network scanning, auto-updates, IPC handlers, and enhanced Linux packaging configurations. ([47dfaf5](https://github.com/robermar23/netspectre/commit/47dfaf5809c4907c95f67bf4b11dff9e6148e5fd))
+
 ## [1.3.1](https://github.com/robermar23/netspectre/compare/v1.3.0...v1.3.1) (2026-02-23)
 
 

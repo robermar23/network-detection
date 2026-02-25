@@ -27,6 +27,65 @@ A modern, cross-platform desktop application built with Electron, Node.js, and V
 
 ---
 
+## 📦 Installation
+
+### Windows
+Download the latest `.exe` (NSIS installer) or `.exe` (portable) from the [Releases](https://github.com/robermar23/netspectre/releases) page and run it. No additional setup required.
+
+### macOS
+Download the `.dmg` from the [Releases](https://github.com/robermar23/netspectre/releases) page, open it, and drag NetSpecter to your Applications folder.
+
+### Linux (Recommended: `.deb`)
+The **`.deb` package** is the recommended way to install on Debian/Ubuntu-based distributions. It automatically handles all system dependencies and provides full desktop integration (menu entry, icons, etc.)
+
+```bash
+# Download the latest .deb from Releases, then:
+sudo dpkg -i netspectre_*.deb
+
+# If there are missing dependencies, fix them with:
+sudo apt-get install -f
+```
+
+To uninstall:
+```bash
+sudo apt remove netspectre
+```
+
+### Linux (Alternative: `.rpm`)
+For Fedora, RHEL, CentOS, or openSUSE:
+
+```bash
+sudo rpm -i netspectre-*.rpm
+# or on Fedora:
+sudo dnf install ./netspectre-*.rpm
+```
+
+### Linux (Alternative: AppImage)
+> ⚠️ **Note:** We recommend the `.deb` or `.rpm` packages for the smoothest experience. AppImage requires extra setup on modern distros.
+
+```bash
+# 1. Make it executable
+chmod +x Netspectre-*.AppImage
+
+# 2. Install FUSE2 (required on Ubuntu 22.04+)
+sudo apt install libfuse2
+
+# 3. Run (as a normal user, NOT with sudo)
+./Netspectre-*.AppImage
+
+# If you must run as root (e.g., for raw socket scanning):
+./Netspectre-*.AppImage --no-sandbox
+```
+
+**Common AppImage issues:**
+| Error | Solution |
+|---|---|
+| `dlopen(): error loading libfuse.so.2` | Install FUSE2: `sudo apt install libfuse2` |
+| `running as root without --no-sandbox` | Run without `sudo`, or add `--no-sandbox` flag |
+| `create mount dir error: Permission Denied` | Ensure `/tmp` is not mounted `noexec`. Try `TMPDIR=$HOME/.cache ./Netspectre-*.AppImage` |
+
+---
+
 ## 📖 Complete Documentation
 For a comprehensive breakdown of exactly how to use each feature, step-by-step UI breakdowns, and advanced Nmap exploitation techniques, please read the [Getting Started Guide](getting-started-guide.md).
 

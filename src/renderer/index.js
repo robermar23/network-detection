@@ -704,24 +704,63 @@ window.electronAPI.onTsharkVlanFound((data) => {
     el.className = 'ds-record selectable-text';
     el.id = key;
     el.style.borderLeftColor = 'var(--info)';
-    el.innerHTML = `
-      <div class="ds-header" style="align-items: center;">
-        <div class="ds-header-title">
-          <span class="ds-port selectable-text">VLAN ${data.vlan}</span>
-          <span class="ds-service" style="margin-left: 8px;">802.1Q Tag</span>
-        </div>
-        <button class="btn icon-only copy-vlan" title="Copy to clipboard" data-vlan="${data.vlan}" data-src="${data.srcMac}" data-dst="${data.dstMac}">
-          📋
-        </button>
-      </div>
-      <div class="ds-details" style="font-size: 11px; margin-top: 4px;">
-        Captured between <span class="selectable-text" style="font-family:monospace">${data.srcMac}</span> and <span class="selectable-text" style="font-family:monospace">${data.dstMac}</span>
-      </div>
-    `;
+    const header = document.createElement('div');
+    header.className = 'ds-header';
+    header.style.alignItems = 'center';
+
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'ds-header-title';
+
+    const portSpan = document.createElement('span');
+    portSpan.className = 'ds-port selectable-text';
+    portSpan.textContent = `VLAN ${data.vlan}`;
+
+    const serviceSpan = document.createElement('span');
+    serviceSpan.className = 'ds-service';
+    serviceSpan.style.marginLeft = '8px';
+    serviceSpan.textContent = '802.1Q Tag';
+
+    titleDiv.appendChild(portSpan);
+    titleDiv.appendChild(serviceSpan);
+
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'btn icon-only copy-vlan';
+    copyBtn.title = 'Copy to clipboard';
+    copyBtn.dataset.vlan = data.vlan;
+    copyBtn.dataset.src = data.srcMac;
+    copyBtn.dataset.dst = data.dstMac;
+    copyBtn.textContent = '📋';
+
+    header.appendChild(titleDiv);
+    header.appendChild(copyBtn);
+
+    const detailsDiv = document.createElement('div');
+    detailsDiv.className = 'ds-details';
+    detailsDiv.style.fontSize = '11px';
+    detailsDiv.style.marginTop = '4px';
+    detailsDiv.textContent = 'Captured between ';
+
+    const srcMacSpan = document.createElement('span');
+    srcMacSpan.className = 'selectable-text';
+    srcMacSpan.style.fontFamily = 'monospace';
+    srcMacSpan.textContent = data.srcMac;
+
+    const andText = document.createTextNode(' and ');
+
+    const dstMacSpan = document.createElement('span');
+    dstMacSpan.className = 'selectable-text';
+    dstMacSpan.style.fontFamily = 'monospace';
+    dstMacSpan.textContent = data.dstMac;
+
+    detailsDiv.appendChild(srcMacSpan);
+    detailsDiv.appendChild(andText);
+    detailsDiv.appendChild(dstMacSpan);
+
+    el.appendChild(header);
+    el.appendChild(detailsDiv);
     vlanResultsContainer.appendChild(el);
 
     // Attach copy event listener explicitly to this new button
-    const copyBtn = el.querySelector('.copy-vlan');
     if (copyBtn) {
       copyBtn.addEventListener('click', () => {
          const textToCopy = `VLAN ID: ${data.vlan}\nSource MAC: ${data.srcMac}\nDest MAC: ${data.dstMac}`;
@@ -738,10 +777,21 @@ window.electronAPI.onTsharkError((err) => {
   const el = document.createElement('div');
   el.className = 'ds-record';
   el.style.borderLeftColor = 'var(--danger)';
-  el.innerHTML = `
-    <div style="color: var(--danger); font-size: 12px; font-weight: bold;">Capture Error</div>
-    <div style="color: var(--text-muted); font-size: 11px; margin-top: 4px; white-space: pre-wrap;">${err}</div>
-  `;
+  const errHeader = document.createElement('div');
+  errHeader.style.color = 'var(--danger)';
+  errHeader.style.fontSize = '12px';
+  errHeader.style.fontWeight = 'bold';
+  errHeader.textContent = 'Capture Error';
+
+  const errBody = document.createElement('div');
+  errBody.style.color = 'var(--text-muted)';
+  errBody.style.fontSize = '11px';
+  errBody.style.marginTop = '4px';
+  errBody.style.whiteSpace = 'pre-wrap';
+  errBody.textContent = err;
+
+  el.appendChild(errHeader);
+  el.appendChild(errBody);
   vlanResultsContainer.appendChild(el);
 });
 
@@ -783,54 +833,108 @@ function getActionButtonsHtml(ip, data) {
 }
 
 function openDetailsPanel(host) {
-  let savedDeepScanHtml = '';
-  if (host.deepAudit && host.deepAudit.history && host.deepAudit.history.length > 0) {
-     host.deepAudit.history.forEach(data => {
-        let bannerHtml = '';
-        if (data.rawBanner) {
-           const safeBanner = data.rawBanner.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-           bannerHtml = `<div class="ds-banner">${safeBanner}</div>`;
-        }
+  function renderSavedHistory(host) {
+    const dsResultsContainer = document.getElementById('deep-scan-results');
+    const nmapResultsContainer = document.getElementById('nmap-scan-results');
+    if (!dsResultsContainer || !nmapResultsContainer) return;
 
-        let actionTag = '';
+    if (host.deepAudit && host.deepAudit.history && host.deepAudit.history.length > 0) {
+      host.deepAudit.history.forEach(data => {
+        const record = document.createElement('div');
+        record.className = 'ds-record';
         if (data.vulnerable) {
-           const cl = data.severity === 'critical' ? 'danger' : 'warning';
-           actionTag = `<span style="font-size: 10px; color: var(--${cl}); border: 1px solid var(--${cl}); padding: 2px 4px; border-radius: 2px;">${data.severity.toUpperCase()}</span>`;
+          record.style.borderLeftColor = 'var(--danger)';
+          record.style.background = 'rgba(235,94,94,0.05)';
         }
-        
-        savedDeepScanHtml += `
-          <div class="ds-record" style="${data.vulnerable ? 'border-left-color: var(--danger); background: rgba(235,94,94,0.05);' : ''}">
-            <div class="ds-header">
-              <div class="ds-header-title">
-                <span class="ds-port">PORT ${data.port}</span>
-                <span class="ds-service">${data.serviceName}</span>
-                ${actionTag}
-              </div>
-              ${getActionButtonsHtml(host.ip, data)}
-            </div>
-            <div class="ds-details" style="${data.vulnerable ? 'color: var(--danger); font-weight: 500;' : ''}">${data.details}</div>
-            ${bannerHtml}
-          </div>
-        `;
-     });
-  }
 
-  function getSavedNmapHtml(h) {
-    if (!h.nmapData) return '';
-    let html = '';
-    ['deep', 'host', 'vuln'].forEach(type => {
-      if (h.nmapData[type]) {
-        const safeText = h.nmapData[type].replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        html += `<div class="ds-record"><div class="ds-service">Saved Nmap ${type.toUpperCase()} Scan</div><div class="ds-banner">${safeText}</div></div>`;
-      }
-    });
-    if (h.nmapData.ports) {
-      Object.keys(h.nmapData.ports).forEach(port => {
-        const safeText = h.nmapData.ports[port].replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        html += `<div class="ds-record"><div class="ds-service">Saved Nmap Port Scan (Port ${port})</div><div class="ds-banner">${safeText}</div></div>`;
+        const headerNode = document.createElement('div');
+        headerNode.className = 'ds-header';
+
+        const titleNode = document.createElement('div');
+        titleNode.className = 'ds-header-title';
+
+        const portSpan = document.createElement('span');
+        portSpan.className = 'ds-port';
+        portSpan.textContent = `PORT ${data.port}`;
+
+        const serviceSpan = document.createElement('span');
+        serviceSpan.className = 'ds-service';
+        serviceSpan.textContent = data.serviceName;
+
+        titleNode.appendChild(portSpan);
+        titleNode.appendChild(serviceSpan);
+
+        if (data.vulnerable) {
+          const cl = data.severity === 'critical' ? 'danger' : 'warning';
+          const tag = document.createElement('span');
+          tag.style.cssText = `font-size: 10px; color: var(--${cl}); border: 1px solid var(--${cl}); padding: 2px 4px; border-radius: 2px;`;
+          tag.textContent = data.severity.toUpperCase();
+          titleNode.appendChild(tag);
+        }
+
+        headerNode.appendChild(titleNode);
+        
+        const actionsContainer = document.createElement('div');
+        actionsContainer.className = 'ds-actions';
+        // Hydrate actions via innerHTML for complex buttons but since these are hardcoded patterns it's relatively safe
+        // though we could also refactor getActionButtonsHtml to return elements.
+        actionsContainer.innerHTML = getActionButtonsHtml(host.ip, data);
+        headerNode.appendChild(actionsContainer);
+
+        const detailsDiv = document.createElement('div');
+        detailsDiv.className = 'ds-details';
+        if (data.vulnerable) {
+          detailsDiv.style.color = 'var(--danger)';
+          detailsDiv.style.fontWeight = '500';
+        }
+        detailsDiv.textContent = data.details;
+
+        record.appendChild(headerNode);
+        record.appendChild(detailsDiv);
+
+        if (data.rawBanner) {
+          const bannerDiv = document.createElement('div');
+          bannerDiv.className = 'ds-banner';
+          bannerDiv.textContent = data.rawBanner;
+          record.appendChild(bannerDiv);
+        }
+
+        dsResultsContainer.appendChild(record);
       });
     }
-    return html;
+
+    if (host.nmapData) {
+      ['deep', 'host', 'vuln'].forEach(type => {
+        if (host.nmapData[type]) {
+          const record = document.createElement('div');
+          record.className = 'ds-record';
+          const service = document.createElement('div');
+          service.className = 'ds-service';
+          service.textContent = `Saved Nmap ${type.toUpperCase()} Scan`;
+          const banner = document.createElement('div');
+          banner.className = 'ds-banner';
+          banner.textContent = host.nmapData[type];
+          record.appendChild(service);
+          record.appendChild(banner);
+          nmapResultsContainer.appendChild(record);
+        }
+      });
+      if (host.nmapData.ports) {
+        Object.keys(host.nmapData.ports).forEach(port => {
+          const record = document.createElement('div');
+          record.className = 'ds-record';
+          const service = document.createElement('div');
+          service.className = 'ds-service';
+          service.textContent = `Saved Nmap Port Scan (Port ${port})`;
+          const banner = document.createElement('div');
+          banner.className = 'ds-banner';
+          banner.textContent = host.nmapData.ports[port];
+          record.appendChild(service);
+          record.appendChild(banner);
+          nmapResultsContainer.appendChild(record);
+        });
+      }
+    }
   }
 
   elements.detailsContent.innerHTML = `
@@ -974,9 +1078,8 @@ function openDetailsPanel(host) {
       vHeader.style.cssText = 'font-weight: 600; font-family: monospace; color: var(--danger); margin-bottom: 4px;';
       vHeader.textContent = `${v.id} (${v.severity.toUpperCase()})`;
       const vBody = document.createElement('div');
-      vBody.style.cssText = 'color: var(--text-muted); line-height: 1.4;';
-      // v.details is safely built in nmap module, but insert using DOM to pass linters
-      vBody.insertAdjacentHTML('beforeend', v.details.replace(/\n/g, '<br>'));
+      vBody.style.cssText = 'color: var(--text-muted); line-height: 1.4; white-space: pre-wrap;';
+      vBody.textContent = v.details;
       
       vDiv.appendChild(vHeader);
       vDiv.appendChild(vBody);
@@ -996,14 +1099,7 @@ function openDetailsPanel(host) {
   document.getElementById('btn-run-ncat').setAttribute('data-ip', host.ip);
   document.getElementById('nse-search-input').placeholder = `Search ${state.nmapScripts?.length || 0} scripts (e.g. smb-)`;
 
-  if (savedDeepScanHtml) {
-    document.getElementById('deep-scan-results').insertAdjacentHTML('beforeend', savedDeepScanHtml);
-  }
-  
-  const savedNmapHtml = getSavedNmapHtml(host);
-  if (savedNmapHtml) {
-    document.getElementById('nmap-scan-results').insertAdjacentHTML('beforeend', savedNmapHtml);
-  }
+  renderSavedHistory(host);
   elements.detailsPanel.classList.add('open');
   elements.sidebarResizer.style.display = 'block';
 
@@ -2104,7 +2200,7 @@ if (window.electronAPI) {
 
       if (wasCancelled) {
         const bannerBlock = document.getElementById(`nmap-live-banner-${type}`);
-        if (bannerBlock) bannerBlock.innerHTML += '\n\n[DISCONNECTED]';
+        if (bannerBlock) bannerBlock.textContent += '\n\n[DISCONNECTED]';
       }
     }
 
@@ -2118,7 +2214,7 @@ if (window.electronAPI) {
     const type = data.type;
     const bannerBlock = document.getElementById(`nmap-live-banner-${type}`);
     if (bannerBlock) {
-       bannerBlock.innerHTML += `\n\n[ERROR]: ${data.error}`;
+       bannerBlock.textContent += `\n\n[ERROR]: ${data.error}`;
     }
     
     const target = data.target;

@@ -20,7 +20,7 @@
     "build": "npm run build:preload && vite build",
     "dist": "npm run build && electron-builder",
     "preview": "vite preview",
-    "test": "vitest run --dir ./test"
+    "test": "vitest run"
   },
   "build": {
     "appId": "com.robermar23.netspectre",

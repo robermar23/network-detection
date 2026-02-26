@@ -35,7 +35,6 @@ elements.btnCloseNmapBanner.addEventListener('click', () => {
 });
 
 // --- Settings Modal Logic ---
-// --- Settings Modal Logic ---
 const btnSettings = document.getElementById('btn-settings');
 const settingsModalOverlay = document.getElementById('settings-modal-overlay');
 const btnCloseSettingsModal = document.getElementById('btn-close-settings-modal');
@@ -46,37 +45,89 @@ const toggleNmap = document.getElementById('setting-nmap-enabled');
 const statusNmap = document.getElementById('status-nmap');
 const toggleTshark = document.getElementById('setting-tshark-enabled');
 const statusTshark = document.getElementById('status-tshark');
-const vlanPanelToggleBtn = document.getElementById('btn-toggle-vlan-panel');
+
+// VLAN Discovery DOM elements
+const btnToggleVlanPanel = document.getElementById('btn-toggle-vlan-panel');
+const vlanPanel = document.getElementById('vlan-panel');
+const btnCloseVlanPanel = document.getElementById('btn-close-vlan-panel');
+const vlanInterfaceSelect = document.getElementById('vlan-interface-select');
+const btnRefreshVlanInterfaces = document.getElementById('btn-refresh-vlan-interfaces');
+const btnStartVlanCapture = document.getElementById('btn-start-vlan-capture');
+const vlanCountSpan = document.getElementById('vlan-count');
+const vlanResultsContainer = document.getElementById('vlan-results-container');
+const vlanEmptyState = document.getElementById('vlan-empty-state');
+
+// --- Settings & Panel Helpers ---
+async function syncDependencyToggle({
+  checkFn,
+  installedText,
+  missingText,
+  statusEl,
+  settingsKey,
+  toggleEl,
+}) {
+  const { installed } = await checkFn();
+  const statusText = statusEl.querySelector('.status-text');
+  
+  statusEl.classList.toggle('installed', installed);
+  statusEl.classList.toggle('missing', !installed);
+  if (statusText) {
+    statusText.textContent = installed ? installedText : missingText;
+  }
+
+  const settings = await api.settings.getAll();
+  const enabled = settings[settingsKey]?.enabled !== false;
+
+  toggleEl.checked = enabled;
+  if (!installed && enabled) {
+    toggleEl.checked = false;
+    toggleEl.disabled = true;
+    await api.settings.set(`${settingsKey}.enabled`, false);
+  }
+
+  return { installed, enabled };
+}
+
+function openPanel(panelEl, sidebarResizerEl) {
+  panelEl.style.display = 'flex';
+  setTimeout(() => panelEl.classList.add('open'), 10);
+  sidebarResizerEl.style.display = 'block';
+}
+
+function closePanel(panelEl, sidebarResizerEl) {
+  panelEl.classList.remove('open');
+  setTimeout(() => {
+    panelEl.style.display = 'none';
+    const otherPanelOpen = panelEl === vlanPanel 
+      ? elements.detailsPanel.classList.contains('open')
+      : (vlanPanel && vlanPanel.classList.contains('open'));
+      
+    if (!otherPanelOpen) {
+      sidebarResizerEl.style.display = 'none';
+    }
+  }, 300);
+}
 
 async function loadAndApplySettings() {
   const settings = await api.settings.getAll();
   
-  // Nmap logic
-  const nmapInstalled = await api.checkNmap();
-  statusNmap.textContent = nmapInstalled ? 'Installed' : 'Not Found inside PATH';
-  statusNmap.className = nmapInstalled ? 'status-text success' : 'status-text danger';
-  
-  const nmapEnabled = settings.nmap?.enabled !== false; // default true
-  toggleNmap.checked = nmapEnabled;
-  if (!nmapInstalled && nmapEnabled) {
-    toggleNmap.checked = false;
-    toggleNmap.disabled = true;
-    api.settings.set('nmap.enabled', false);
-  }
+  await syncDependencyToggle({
+    checkFn: async () => ({ installed: await api.checkNmap() }),
+    installedText: 'Installed',
+    missingText: 'Not Found inside PATH',
+    statusEl: statusNmap,
+    settingsKey: 'nmap',
+    toggleEl: toggleNmap,
+  });
 
-  // Tshark logic
-  const tsharkCheck = await api.settings.checkDependency('tshark');
-  const tsharkInstalled = tsharkCheck.installed;
-  statusTshark.textContent = tsharkInstalled ? 'Installed' : 'Not Found inside PATH';
-  statusTshark.className = tsharkInstalled ? 'status-text success' : 'status-text danger';
-
-  const tsharkEnabled = settings.tshark?.enabled !== false; // default true
-  toggleTshark.checked = tsharkEnabled;
-  if (!tsharkInstalled && tsharkEnabled) {
-    toggleTshark.checked = false;
-    toggleTshark.disabled = true;
-    api.settings.set('tshark.enabled', false);
-  }
+  await syncDependencyToggle({
+    checkFn: () => api.settings.checkDependency('tshark'),
+    installedText: 'Installed',
+    missingText: 'Not Found inside PATH',
+    statusEl: statusTshark,
+    settingsKey: 'tshark',
+    toggleEl: toggleTshark,
+  });
 
   applySettingsUI(settings);
 }
@@ -95,10 +146,9 @@ function applySettingsUI(settings) {
   });
 
   if (!tsharkEnabled && vlanPanel) {
+     vlanPanel.classList.remove('open');
      vlanPanel.style.display = 'none';
-     if (elements.detailsPanel.classList.contains('open')) {
-        elements.sidebarResizer.style.display = 'block';
-     } else {
+     if (!elements.detailsPanel.classList.contains('open')) {
         elements.sidebarResizer.style.display = 'none';
      }
   }
@@ -561,43 +611,26 @@ elements.blacklistInput.addEventListener('keydown', (e) => {
 let isVlanCapturing = false;
 let vlanTagsDetected = new Set();
 
-const btnToggleVlanPanel = document.getElementById('btn-toggle-vlan-panel');
-const vlanPanel = document.getElementById('vlan-panel');
-const btnCloseVlanPanel = document.getElementById('btn-close-vlan-panel');
-const vlanInterfaceSelect = document.getElementById('vlan-interface-select');
-const btnRefreshVlanInterfaces = document.getElementById('btn-refresh-vlan-interfaces');
-const btnStartVlanCapture = document.getElementById('btn-start-vlan-capture');
-const vlanCountSpan = document.getElementById('vlan-count');
-const vlanResultsContainer = document.getElementById('vlan-results-container');
-const vlanEmptyState = document.getElementById('vlan-empty-state');
+// --- VLAN Event Handlers ---
 
 btnToggleVlanPanel.addEventListener('click', async () => {
-  if (vlanPanel.style.display === 'none' || !vlanPanel.classList.contains('open')) {
+  const isOpen = vlanPanel.classList.contains('open');
+
+  if (!isOpen) {
     // Close details panel if open
     if (elements.detailsPanel.classList.contains('open')) {
        elements.detailsPanel.classList.remove('open');
     }
     
-    vlanPanel.style.display = 'flex';
-    // Small timeout to allow display: flex to render before animating opacity via .open
-    setTimeout(() => vlanPanel.classList.add('open'), 10);
-    elements.sidebarResizer.style.display = 'block';
+    openPanel(vlanPanel, elements.sidebarResizer);
     await refreshVlanInterfaces();
   } else {
-    vlanPanel.classList.remove('open');
-    setTimeout(() => vlanPanel.style.display = 'none', 300); // Wait for CSS transition
-    if (!elements.detailsPanel.classList.contains('open')) {
-       elements.sidebarResizer.style.display = 'none';
-    }
+    closePanel(vlanPanel, elements.sidebarResizer);
   }
 });
 
 btnCloseVlanPanel.addEventListener('click', () => {
-  vlanPanel.classList.remove('open');
-  setTimeout(() => vlanPanel.style.display = 'none', 300);
-  if (!elements.detailsPanel.classList.contains('open')) {
-     elements.sidebarResizer.style.display = 'none';
-  }
+  closePanel(vlanPanel, elements.sidebarResizer);
 });
 
 btnRefreshVlanInterfaces.addEventListener('click', refreshVlanInterfaces);
@@ -977,7 +1010,7 @@ function openDetailsPanel(host) {
   attachDetailsPanelListeners(host);
   
   // Re-apply settings to hide Nmap buttons if disabled
-  window.electronAPI.settings.getAll().then(settings => applySettings(settings));
+  window.electronAPI.settings.getAll().then(settings => applySettingsUI(settings));
 }
 
 function attachDetailsPanelListeners(host) {

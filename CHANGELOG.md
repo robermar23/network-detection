@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.1](https://github.com/robermar23/netspectre/compare/v1.7.0...v1.7.1) (2026-02-26)
+
+
+### Bug Fixes
+
+* **main:** resolve MAC parsing and macOS tool detection ([3a2a3ba](https://github.com/robermar23/netspectre/commit/3a2a3ba0c0d95e1a070cf6f9b6ff1fb89c7cef84))
+
 ## [1.7.0](https://github.com/robermar23/netspectre/compare/v1.6.0...v1.7.0) (2026-02-26)
 
 

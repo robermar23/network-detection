@@ -21,5 +21,14 @@ export default defineConfig({
   },
   server: {
     port: 5173
+  },
+  test: {
+    root: '.',
+    include: ['test/**/*.test.js'],
+    coverage: {
+      provider: 'v8',
+      include: ['src/main/**/*.js', 'src/shared/**/*.js'],
+      exclude: ['src/main/preload.js', 'src/main/preload.cjs', 'src/main/main.js']
+    }
   }
 });

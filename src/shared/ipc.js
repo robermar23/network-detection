@@ -39,5 +39,18 @@ export const IPC_CHANNELS = {
   IMPORT_SCOPE_FILE: 'import-scope-file',
   IMPORT_NMAP_XML: 'import-nmap-xml',
   PING_HOST: 'ping-host',
-  PROBE_HOST: 'probe-host'
+  PROBE_HOST: 'probe-host',
+  
+  // Settings Management
+  GET_SETTING: 'get-setting',
+  SET_SETTING: 'set-setting',
+  GET_ALL_SETTINGS: 'get-all-settings',
+  CHECK_DEPENDENCY: 'check-dependency',
+  
+  // Tshark (VLAN Discovery)
+  START_TSHARK: 'start-tshark',
+  STOP_TSHARK: 'stop-tshark',
+  TSHARK_VLAN_FOUND: 'tshark-vlan-found',
+  TSHARK_ERROR: 'tshark-error',
+  TSHARK_COMPLETE: 'tshark-complete'
 };

@@ -30,8 +30,10 @@ chmod +x Netspectre-*.AppImage
 
 > **💡 Tip:** NetSpecter detects if you are running as root on Linux and automatically applies the `--no-sandbox` flag internally. For the `.deb` and `.rpm` packages, this is handled seamlessly.
 
-### Optional: Nmap
-For advanced scanning features, install [Nmap](https://nmap.org/download.html) via your system package manager:
+### Optional: Nmap & Wireshark (Tshark)
+For advanced scanning features, it is highly recommended to install [Nmap](https://nmap.org/download.html) and [Wireshark](https://www.wireshark.org/download.html) (which includes `tshark`).
+
+**Nmap Installation:**
 ```bash
 # Debian/Ubuntu
 sudo apt install nmap
@@ -42,14 +44,29 @@ sudo dnf install nmap
 # macOS (Homebrew)
 brew install nmap
 
-# Windows — download from nmap.org
+# Windows — download from nmap.org and ensure it's in your PATH.
+```
+
+**Wireshark (Tshark) Installation:**
+```bash
+# Debian/Ubuntu
+sudo apt install tshark
+
+# Fedora/RHEL
+sudo dnf install wireshark-cli
+
+# macOS (Homebrew)
+brew install wireshark
+
+# Windows — download Wireshark from wireshark.org. Ensure you install Npcap and check the box to add Wireshark to the system PATH.
 ```
 
 ## 1. Initial Setup and Scanning
 
 1. **Launch the Application**: Run the executable or `npm run dev` if you're developing locally. You will be greeted by the Dashboard.
-2. **Select an Interface**: At the top left, a dropdown menu populates with all detected physical network interfaces on your system (Wi-Fi, Ethernet). Select the network segment you want to scan.
-3. **Scan Network**: Click the "Scan Network" button. NetSpecter will instantly sweep the `/24` subnet boundaries of your selected interface using lightweight asynchronous ICMP pings and fallback ARP resolution.
+2. **Review Settings ⚙️**: Click the **Settings** button in the top right. Here you can verify if NetSpecter has successfully detected your Nmap and Tshark installations in the system PATH. You can toggle these engines on or off at any time using the switches.
+3. **Select an Interface**: At the top left, a dropdown menu populates with all detected physical network interfaces on your system (Wi-Fi, Ethernet). Select the network segment you want to scan.
+4. **Scan Network**: Click the "Scan Network" button. NetSpecter will instantly sweep the `/24` subnet boundaries of your selected interface using lightweight asynchronous ICMP pings and fallback ARP resolution.
 
 ## 2. Navigating the Dashboard
 
@@ -117,7 +134,17 @@ Behind the Nmap Engine toggle is the localized **Ncat** Engine. This allows for 
 3. Fill out the `Payload` field (e.g. `GET / HTTP/1.0\r\n\r\n` or raw byte drops).
 4. Click Connect & Send. The UI will keep the stream open to visualize bidirectional byte-drops mimicking raw native network connectivity.
 
-## 8. Persisting Data (Saving and Loading)
+## 8. VLAN Tag Discovery (Tshark)
+
+NetSpecter natively integrates with Wireshark's CLI tool (`tshark`) to passively hunt for 802.1Q tags on your network interfaces, useful for uncovering misconfigured Trunk ports or preventing VLAN Hopping attacks.
+
+1. Ensure Tshark is installed and enabled in the **Settings** modal.
+2. Click the **🦈 VLAN Discovery** button located in the top control bar (next to the view toggles) to open the VLAN panel.
+3. Choose the physical interface you want to listen on.
+4. Click **Start Capture**. NetSpecter will transparently orchestrate a Wireshark capture filtered strictly to `vlan` packets.
+5. As tagged frames are intercepted traversing the wire, the UI will extract the `VLAN ID` and the source/destination MAC addresses, appending them securely to the streaming dashboard widget in real-time.
+
+## 9. Persisting Data (Saving and Loading)
 
 Any Nmap Scans, NSE Explorations, and Native Port Banners queried in the current application state session are saved in the DOM.
 

@@ -1,5 +1,6 @@
 import { spawn, exec, execSync } from 'child_process';
 import os from 'os';
+import { getSetting } from './store.js';
 
 const activeScans = new Map(); // Store child processes by ID (ip or subnet)
 
@@ -61,9 +62,10 @@ export async function runNmapScan(type, targetObj, onResultCallback, onCompleteC
     return;
   }
 
-  console.log(`Starting Nmap ${type} scan on ${target} with args:`, args.join(' '));
+  const nmapExecutable = getSetting('nmap.path') || 'nmap';
+  console.log(`Starting Nmap ${type} scan on ${target} at ${nmapExecutable} with args:`, args.join(' '));
 
-  const nmapProcess = spawn('nmap', args);
+  const nmapProcess = spawn(nmapExecutable, args);
   activeScans.set(target, nmapProcess);
 
   let outputBuffer = '';
@@ -108,9 +110,16 @@ export async function runNcat({ target, port, payload }, onResultCallback, onCom
   // We use -w 5 for a 5 second timeout so it doesn't hang forever if unresponsive.
   let args = ['-v', '-w', '10', target, port];
   
-  console.log(`Starting Ncat on ${target}:${port} with args:`, args.join(' '));
+  // Ncat path logic tries to assume Ncat lives relative to Nmap
+  let ncatExecutable = 'ncat';
+  const nmapStoredPath = getSetting('nmap.path');
+  if (nmapStoredPath && nmapStoredPath.toLowerCase().endsWith('nmap.exe')) {
+     ncatExecutable = nmapStoredPath.replace(/nmap\.exe$/i, 'ncat.exe');
+  }
 
-  const ncatProcess = spawn('ncat', args);
+  console.log(`Starting Ncat on ${target}:${port} at ${ncatExecutable} with args:`, args.join(' '));
+
+  const ncatProcess = spawn(ncatExecutable, args);
   // Share the same activeScans registry so cancellation works seamlessly
   activeScans.set(target, ncatProcess);
 

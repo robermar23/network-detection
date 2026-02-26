@@ -22,7 +22,7 @@ api.checkNmap().then(async (installed) => {
     elements.nmapInstallBanner.style.display = 'block';
   } else {
     state.nmapScripts = await api.getNmapScripts();
-    console.log(`Loaded ${state.nmapScripts.length} native Nmap scripts from backend.`);
+    console.log(`Loaded ${state.nmapScripts?.length || 0} native Nmap scripts from backend.`);
     // Reveal Nmap scan-all options
     document.querySelectorAll('.scan-all-option.nmap-only').forEach(el => {
       el.style.display = 'flex';
@@ -33,6 +33,155 @@ api.checkNmap().then(async (installed) => {
 elements.btnCloseNmapBanner.addEventListener('click', () => {
   elements.nmapInstallBanner.style.display = 'none';
 });
+
+// --- Settings Modal Logic ---
+const btnSettings = document.getElementById('btn-settings');
+const settingsModalOverlay = document.getElementById('settings-modal-overlay');
+const btnCloseSettingsModal = document.getElementById('btn-close-settings-modal');
+const btnSettingsDone = document.getElementById('btn-settings-done');
+
+// Settings DOM elements
+const toggleNmap = document.getElementById('setting-nmap-enabled');
+const statusNmap = document.getElementById('status-nmap');
+const toggleTshark = document.getElementById('setting-tshark-enabled');
+const statusTshark = document.getElementById('status-tshark');
+
+// VLAN Discovery DOM elements
+const btnToggleVlanPanel = document.getElementById('btn-toggle-vlan-panel');
+const vlanPanel = document.getElementById('vlan-panel');
+const btnCloseVlanPanel = document.getElementById('btn-close-vlan-panel');
+const vlanInterfaceSelect = document.getElementById('vlan-interface-select');
+const btnRefreshVlanInterfaces = document.getElementById('btn-refresh-vlan-interfaces');
+const btnStartVlanCapture = document.getElementById('btn-start-vlan-capture');
+const vlanCountSpan = document.getElementById('vlan-count');
+const vlanResultsContainer = document.getElementById('vlan-results-container');
+const vlanEmptyState = document.getElementById('vlan-empty-state');
+
+// --- Settings & Panel Helpers ---
+async function syncDependencyToggle({
+  checkFn,
+  installedText,
+  missingText,
+  statusEl,
+  settingsKey,
+  toggleEl,
+}) {
+  const { installed } = await checkFn();
+  const statusText = statusEl.querySelector('.status-text');
+  
+  statusEl.classList.toggle('installed', installed);
+  statusEl.classList.toggle('missing', !installed);
+  if (statusText) {
+    statusText.textContent = installed ? installedText : missingText;
+  }
+
+  const settings = await api.settings.getAll();
+  const enabled = settings[settingsKey]?.enabled !== false;
+
+  toggleEl.checked = enabled;
+  if (!installed && enabled) {
+    toggleEl.checked = false;
+    toggleEl.disabled = true;
+    await api.settings.set(`${settingsKey}.enabled`, false);
+  }
+
+  return { installed, enabled };
+}
+
+function openPanel(panelEl, sidebarResizerEl) {
+  panelEl.style.display = 'flex';
+  setTimeout(() => panelEl.classList.add('open'), 10);
+  sidebarResizerEl.style.display = 'block';
+}
+
+function closePanel(panelEl, sidebarResizerEl) {
+  panelEl.classList.remove('open');
+  setTimeout(() => {
+    panelEl.style.display = 'none';
+    const otherPanelOpen = panelEl === vlanPanel 
+      ? elements.detailsPanel.classList.contains('open')
+      : (vlanPanel && vlanPanel.classList.contains('open'));
+      
+    if (!otherPanelOpen) {
+      sidebarResizerEl.style.display = 'none';
+    }
+  }, 300);
+}
+
+async function loadAndApplySettings() {
+  const settings = await api.settings.getAll();
+  
+  await syncDependencyToggle({
+    checkFn: async () => ({ installed: await api.checkNmap() }),
+    installedText: 'Installed',
+    missingText: 'Not Found inside PATH',
+    statusEl: statusNmap,
+    settingsKey: 'nmap',
+    toggleEl: toggleNmap,
+  });
+
+  await syncDependencyToggle({
+    checkFn: () => api.settings.checkDependency('tshark'),
+    installedText: 'Installed',
+    missingText: 'Not Found inside PATH',
+    statusEl: statusTshark,
+    settingsKey: 'tshark',
+    toggleEl: toggleTshark,
+  });
+
+  applySettingsUI(settings);
+}
+
+function applySettingsUI(settings) {
+  // Hide/Show Nmap UI components globally
+  const nmapEnabled = settings.nmap?.enabled !== false;
+  document.querySelectorAll('.nmap-only').forEach(el => {
+    el.style.display = nmapEnabled ? 'flex' : 'none';
+  });
+
+  // Hide/Show Tshark UI components globally
+  const tsharkEnabled = settings.tshark?.enabled !== false;
+  document.querySelectorAll('.tshark-only').forEach(el => {
+    el.style.display = tsharkEnabled ? 'flex' : 'none';
+  });
+
+  if (!tsharkEnabled && vlanPanel) {
+     vlanPanel.classList.remove('open');
+     vlanPanel.style.display = 'none';
+     if (!elements.detailsPanel.classList.contains('open')) {
+        elements.sidebarResizer.style.display = 'none';
+     }
+  }
+}
+
+toggleNmap.addEventListener('change', async (e) => {
+  await api.settings.set('nmap.enabled', e.target.checked);
+  const settings = await api.settings.getAll();
+  applySettingsUI(settings);
+});
+
+toggleTshark.addEventListener('change', async (e) => {
+  await api.settings.set('tshark.enabled', e.target.checked);
+  const settings = await api.settings.getAll();
+  applySettingsUI(settings);
+});
+
+
+btnSettings.addEventListener('click', () => {
+  loadAndApplySettings();
+  settingsModalOverlay.classList.remove('hidden');
+});
+
+btnCloseSettingsModal.addEventListener('click', () => {
+  settingsModalOverlay.classList.add('hidden');
+});
+
+btnSettingsDone.addEventListener('click', () => {
+  settingsModalOverlay.classList.add('hidden');
+});
+
+// Run once on boot
+loadAndApplySettings();
 
 // --- View Toggles ---
 elements.btnViewGrid.addEventListener('click', () => { state.currentView = 'grid'; domUtils.applyViewStyle(state); });
@@ -455,75 +604,361 @@ elements.blacklistInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') elements.btnBlacklistAdd.click();
 });
 
-// --- Details Panel Logic ---
-function getActionButtonsHtml(ip, data) {
-  let actionsHtml = '';
-  if (data.port === 80 || data.port === 8080) {
-    actionsHtml = `<button class="btn-action" onclick="window.electronAPI.openExternalAction({type:'http', ip:'${ip}', port:${data.port}})"><span class="icon">🌐</span> Open HTTP</button>`;
-  } else if (data.port === 443 || data.port === 8443) {
-    actionsHtml = `<button class="btn-action" onclick="window.electronAPI.openExternalAction({type:'https', ip:'${ip}', port:${data.port}})"><span class="icon">🔒</span> Open HTTPS</button>`;
-  } else if (data.port === 22) {
-    const inputId = `ssh-user-${ip.replace(/\./g, '-')}-${data.port}`;
-    actionsHtml = `
-      <div style="display:flex; gap: 4px; align-items: center;">
-        <input type="text" id="${inputId}" class="text-input" style="width: 70px; padding: 4px 6px; font-size: 11px;" placeholder="root" value="root" title="SSH Username">
-        <button class="btn-action" onclick="window.electronAPI.openExternalAction({type:'ssh', ip:'${ip}', username: document.getElementById('${inputId}').value || 'root'})"><span class="icon">⌨️</span> Connect SSH</button>
-      </div>`;
-  } else if (data.port === 3389) {
-    actionsHtml = `<button class="btn-action" onclick="window.electronAPI.openExternalAction({type:'rdp', ip:'${ip}'})"><span class="icon">🖥️</span> Remote Desktop</button>`;
+// =============================================
+// === VLAN DISCOVERY MODULE ===
+// =============================================
+
+let isVlanCapturing = false;
+let vlanTagsDetected = new Set();
+
+// --- VLAN Event Handlers ---
+
+btnToggleVlanPanel.addEventListener('click', async () => {
+  const isOpen = vlanPanel.classList.contains('open');
+
+  if (!isOpen) {
+    // Close details panel if open
+    if (elements.detailsPanel.classList.contains('open')) {
+       elements.detailsPanel.classList.remove('open');
+    }
+    
+    openPanel(vlanPanel, elements.sidebarResizer);
+    await refreshVlanInterfaces();
+  } else {
+    closePanel(vlanPanel, elements.sidebarResizer);
   }
-  return actionsHtml ? `<div class="ds-actions">${actionsHtml}</div>` : '';
+});
+
+btnCloseVlanPanel.addEventListener('click', () => {
+  closePanel(vlanPanel, elements.sidebarResizer);
+});
+
+btnRefreshVlanInterfaces.addEventListener('click', refreshVlanInterfaces);
+
+btnStartVlanCapture.addEventListener('click', async () => {
+  if (isVlanCapturing) {
+    // Stop Capture
+    const res = await api.stopTsharkCapture();
+    if (res.status === 'stopped') {
+      isVlanCapturing = false;
+      btnStartVlanCapture.innerHTML = `<span class="icon">▶️</span> Start Capture`;
+      btnStartVlanCapture.classList.remove('danger', 'pulsing');
+      btnStartVlanCapture.classList.add('primary');
+      vlanInterfaceSelect.disabled = false;
+      btnRefreshVlanInterfaces.disabled = false;
+    }
+  } else {
+    // Start Capture
+    const iface = vlanInterfaceSelect.value;
+    if (!iface) {
+       alert('Please select a network interface first.');
+       return;
+    }
+    
+    vlanResultsContainer.innerHTML = ''; // clear old
+    if(vlanEmptyState) vlanEmptyState.style.display = 'none';
+    vlanTagsDetected.clear();
+    vlanCountSpan.textContent = '0';
+    
+    const res = await api.startTsharkCapture(iface);
+    if (res.status === 'started') {
+      isVlanCapturing = true;
+      btnStartVlanCapture.innerHTML = `<span class="icon">🛑</span> Stop Capture`;
+      btnStartVlanCapture.classList.remove('primary');
+      btnStartVlanCapture.classList.add('danger', 'pulsing');
+      vlanInterfaceSelect.disabled = true;
+      btnRefreshVlanInterfaces.disabled = true;
+    }
+  }
+});
+
+async function refreshVlanInterfaces() {
+  btnRefreshVlanInterfaces.disabled = true;
+  vlanInterfaceSelect.innerHTML = '<option value="">Loading...</option>';
+  try {
+    const interfaces = await api.getInterfaces();
+    vlanInterfaceSelect.innerHTML = '<option value="">Select Interface...</option>';
+    interfaces.forEach(iface => {
+      const opt = document.createElement('option');
+      opt.value = iface.name; 
+      opt.textContent = `${iface.name} (${iface.ip})`;
+      vlanInterfaceSelect.appendChild(opt);
+    });
+  } catch (e) {
+    vlanInterfaceSelect.innerHTML = '<option value="">Error Loading</option>';
+  } finally {
+    btnRefreshVlanInterfaces.disabled = false;
+  }
+}
+
+// Tshark Event Handlers
+window.electronAPI.onTsharkVlanFound((data) => {
+  console.log('VLAN tag found:', data);
+  const key = `vlan-${data.vlan}`;
+  
+  if (!vlanTagsDetected.has(data.vlan)) {
+    vlanTagsDetected.add(data.vlan);
+    vlanCountSpan.textContent = vlanTagsDetected.size;
+    
+    const el = document.createElement('div');
+    el.className = 'ds-record selectable-text';
+    el.id = key;
+    el.style.borderLeftColor = 'var(--info)';
+    const header = document.createElement('div');
+    header.className = 'ds-header';
+    header.style.alignItems = 'center';
+
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'ds-header-title';
+
+    const portSpan = document.createElement('span');
+    portSpan.className = 'ds-port selectable-text';
+    portSpan.textContent = `VLAN ${data.vlan}`;
+
+    const serviceSpan = document.createElement('span');
+    serviceSpan.className = 'ds-service';
+    serviceSpan.style.marginLeft = '8px';
+    serviceSpan.textContent = '802.1Q Tag';
+
+    titleDiv.appendChild(portSpan);
+    titleDiv.appendChild(serviceSpan);
+
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'btn icon-only copy-vlan';
+    copyBtn.title = 'Copy to clipboard';
+    copyBtn.dataset.vlan = data.vlan;
+    copyBtn.dataset.src = data.srcMac;
+    copyBtn.dataset.dst = data.dstMac;
+    copyBtn.textContent = '📋';
+
+    header.appendChild(titleDiv);
+    header.appendChild(copyBtn);
+
+    const detailsDiv = document.createElement('div');
+    detailsDiv.className = 'ds-details';
+    detailsDiv.style.fontSize = '11px';
+    detailsDiv.style.marginTop = '4px';
+    detailsDiv.textContent = 'Captured between ';
+
+    const srcMacSpan = document.createElement('span');
+    srcMacSpan.className = 'selectable-text';
+    srcMacSpan.style.fontFamily = 'monospace';
+    srcMacSpan.textContent = data.srcMac;
+
+    const andText = document.createTextNode(' and ');
+
+    const dstMacSpan = document.createElement('span');
+    dstMacSpan.className = 'selectable-text';
+    dstMacSpan.style.fontFamily = 'monospace';
+    dstMacSpan.textContent = data.dstMac;
+
+    detailsDiv.appendChild(srcMacSpan);
+    detailsDiv.appendChild(andText);
+    detailsDiv.appendChild(dstMacSpan);
+
+    el.appendChild(header);
+    el.appendChild(detailsDiv);
+    vlanResultsContainer.appendChild(el);
+
+    // Attach copy event listener explicitly to this new button
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+         const textToCopy = `VLAN ID: ${data.vlan}\nSource MAC: ${data.srcMac}\nDest MAC: ${data.dstMac}`;
+         navigator.clipboard.writeText(textToCopy);
+         const originalText = copyBtn.innerText;
+         copyBtn.innerText = '✔️';
+         setTimeout(() => { copyBtn.innerText = originalText; }, 2000);
+      });
+    }
+  }
+});
+
+window.electronAPI.onTsharkError((err) => {
+  const el = document.createElement('div');
+  el.className = 'ds-record';
+  el.style.borderLeftColor = 'var(--danger)';
+  const errHeader = document.createElement('div');
+  errHeader.style.color = 'var(--danger)';
+  errHeader.style.fontSize = '12px';
+  errHeader.style.fontWeight = 'bold';
+  errHeader.textContent = 'Capture Error';
+
+  const errBody = document.createElement('div');
+  errBody.style.color = 'var(--text-muted)';
+  errBody.style.fontSize = '11px';
+  errBody.style.marginTop = '4px';
+  errBody.style.whiteSpace = 'pre-wrap';
+  errBody.textContent = err;
+
+  el.appendChild(errHeader);
+  el.appendChild(errBody);
+  vlanResultsContainer.appendChild(el);
+});
+
+window.electronAPI.onTsharkComplete(({ code }) => {
+  isVlanCapturing = false;
+  btnStartVlanCapture.innerHTML = `<span class="icon">▶️</span> Start Capture`;
+  btnStartVlanCapture.classList.remove('danger', 'pulsing');
+  btnStartVlanCapture.classList.add('primary');
+  vlanInterfaceSelect.disabled = false;
+  btnRefreshVlanInterfaces.disabled = false;
+  
+  const el = document.createElement('div');
+  el.style.textAlign = 'center';
+  el.style.color = 'var(--text-muted)';
+  el.style.fontSize = '11px';
+  el.style.marginTop = '8px';
+  el.textContent = `Capture ended (Code ${code})`;
+  vlanResultsContainer.appendChild(el);
+});
+
+// --- Details Panel Logic ---
+function renderActionButtons(container, ip, data) {
+  if (data.port === 80 || data.port === 8080) {
+    const btn = document.createElement('button');
+    btn.className = 'btn-action';
+    btn.innerHTML = '<span class="icon">🌐</span> Open HTTP';
+    btn.addEventListener('click', () => window.electronAPI.openExternalAction({type:'http', ip, port: data.port}));
+    container.appendChild(btn);
+  } else if (data.port === 443 || data.port === 8443) {
+    const btn = document.createElement('button');
+    btn.className = 'btn-action';
+    btn.innerHTML = '<span class="icon">🔒</span> Open HTTPS';
+    btn.addEventListener('click', () => window.electronAPI.openExternalAction({type:'https', ip, port: data.port}));
+    container.appendChild(btn);
+  } else if (data.port === 22) {
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'display:flex; gap: 4px; align-items: center;';
+    
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'text-input';
+    input.style.cssText = 'width: 70px; padding: 4px 6px; font-size: 11px;';
+    input.placeholder = 'root';
+    input.value = 'root';
+    input.title = 'SSH Username';
+    
+    const btn = document.createElement('button');
+    btn.className = 'btn-action';
+    btn.innerHTML = '<span class="icon">⌨️</span> Connect SSH';
+    btn.addEventListener('click', () => {
+      window.electronAPI.openExternalAction({type:'ssh', ip, username: input.value || 'root'});
+    });
+    
+    wrapper.appendChild(input);
+    wrapper.appendChild(btn);
+    container.appendChild(wrapper);
+  } else if (data.port === 3389) {
+    const btn = document.createElement('button');
+    btn.className = 'btn-action';
+    btn.innerHTML = '<span class="icon">🖥️</span> Remote Desktop';
+    btn.addEventListener('click', () => window.electronAPI.openExternalAction({type:'rdp', ip}));
+    container.appendChild(btn);
+  }
 }
 
 function openDetailsPanel(host) {
-  let savedDeepScanHtml = '';
-  if (host.deepAudit && host.deepAudit.history && host.deepAudit.history.length > 0) {
-     host.deepAudit.history.forEach(data => {
-        let bannerHtml = '';
-        if (data.rawBanner) {
-           const safeBanner = data.rawBanner.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-           bannerHtml = `<div class="ds-banner">${safeBanner}</div>`;
-        }
+  function renderSavedHistory(host) {
+    const dsResultsContainer = document.getElementById('deep-scan-results');
+    const nmapResultsContainer = document.getElementById('nmap-scan-results');
+    if (!dsResultsContainer || !nmapResultsContainer) return;
 
-        let actionTag = '';
+    if (host.deepAudit && host.deepAudit.history && host.deepAudit.history.length > 0) {
+      host.deepAudit.history.forEach(data => {
+        const record = document.createElement('div');
+        record.className = 'ds-record';
         if (data.vulnerable) {
-           const cl = data.severity === 'critical' ? 'danger' : 'warning';
-           actionTag = `<span style="font-size: 10px; color: var(--${cl}); border: 1px solid var(--${cl}); padding: 2px 4px; border-radius: 2px;">${data.severity.toUpperCase()}</span>`;
+          record.style.borderLeftColor = 'var(--danger)';
+          record.style.background = 'rgba(235,94,94,0.05)';
         }
-        
-        savedDeepScanHtml += `
-          <div class="ds-record" style="${data.vulnerable ? 'border-left-color: var(--danger); background: rgba(235,94,94,0.05);' : ''}">
-            <div class="ds-header">
-              <div class="ds-header-title">
-                <span class="ds-port">PORT ${data.port}</span>
-                <span class="ds-service">${data.serviceName}</span>
-                ${actionTag}
-              </div>
-              ${getActionButtonsHtml(host.ip, data)}
-            </div>
-            <div class="ds-details" style="${data.vulnerable ? 'color: var(--danger); font-weight: 500;' : ''}">${data.details}</div>
-            ${bannerHtml}
-          </div>
-        `;
-     });
-  }
 
-  function getSavedNmapHtml(h) {
-    if (!h.nmapData) return '';
-    let html = '';
-    ['deep', 'host', 'vuln'].forEach(type => {
-      if (h.nmapData[type]) {
-        const safeText = h.nmapData[type].replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        html += `<div class="ds-record"><div class="ds-service">Saved Nmap ${type.toUpperCase()} Scan</div><div class="ds-banner">${safeText}</div></div>`;
-      }
-    });
-    if (h.nmapData.ports) {
-      Object.keys(h.nmapData.ports).forEach(port => {
-        const safeText = h.nmapData.ports[port].replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        html += `<div class="ds-record"><div class="ds-service">Saved Nmap Port Scan (Port ${port})</div><div class="ds-banner">${safeText}</div></div>`;
+        const headerNode = document.createElement('div');
+        headerNode.className = 'ds-header';
+
+        const titleNode = document.createElement('div');
+        titleNode.className = 'ds-header-title';
+
+        const portSpan = document.createElement('span');
+        portSpan.className = 'ds-port';
+        portSpan.textContent = `PORT ${data.port}`;
+
+        const serviceSpan = document.createElement('span');
+        serviceSpan.className = 'ds-service';
+        serviceSpan.textContent = data.serviceName;
+
+        titleNode.appendChild(portSpan);
+        titleNode.appendChild(serviceSpan);
+
+        if (data.vulnerable) {
+          const cl = data.severity === 'critical' ? 'danger' : 'warning';
+          const tag = document.createElement('span');
+          tag.style.cssText = `font-size: 10px; color: var(--${cl}); border: 1px solid var(--${cl}); padding: 2px 4px; border-radius: 2px;`;
+          tag.textContent = data.severity.toUpperCase();
+          titleNode.appendChild(tag);
+        }
+
+        headerNode.appendChild(titleNode);
+        
+        const actionsContainer = document.createElement('div');
+        actionsContainer.className = 'ds-actions';
+        // Hydrate actions via innerHTML for complex buttons but since these are hardcoded patterns it's relatively safe
+        renderActionButtons(actionsContainer, host.ip, data);
+        headerNode.appendChild(actionsContainer);
+
+        const detailsDiv = document.createElement('div');
+        detailsDiv.className = 'ds-details';
+        if (data.vulnerable) {
+          detailsDiv.style.color = 'var(--danger)';
+          detailsDiv.style.fontWeight = '500';
+        }
+        detailsDiv.textContent = data.details;
+
+        record.appendChild(headerNode);
+        record.appendChild(detailsDiv);
+
+        if (data.rawBanner) {
+          const bannerDiv = document.createElement('div');
+          bannerDiv.className = 'ds-banner';
+          bannerDiv.textContent = data.rawBanner;
+          record.appendChild(bannerDiv);
+        }
+
+        dsResultsContainer.appendChild(record);
       });
     }
-    return html;
+
+    if (host.nmapData) {
+      ['deep', 'host', 'vuln'].forEach(type => {
+        if (host.nmapData[type]) {
+          const record = document.createElement('div');
+          record.className = 'ds-record';
+          const service = document.createElement('div');
+          service.className = 'ds-service';
+          service.textContent = `Saved Nmap ${type.toUpperCase()} Scan`;
+          const banner = document.createElement('div');
+          banner.className = 'ds-banner';
+          banner.textContent = host.nmapData[type];
+          record.appendChild(service);
+          record.appendChild(banner);
+          nmapResultsContainer.appendChild(record);
+        }
+      });
+      if (host.nmapData.ports) {
+        Object.keys(host.nmapData.ports).forEach(port => {
+          const record = document.createElement('div');
+          record.className = 'ds-record';
+          const service = document.createElement('div');
+          service.className = 'ds-service';
+          service.textContent = `Saved Nmap Port Scan (Port ${port})`;
+          const banner = document.createElement('div');
+          banner.className = 'ds-banner';
+          banner.textContent = host.nmapData.ports[port];
+          record.appendChild(service);
+          record.appendChild(banner);
+          nmapResultsContainer.appendChild(record);
+        });
+      }
+    }
   }
 
   elements.detailsContent.innerHTML = `
@@ -667,9 +1102,8 @@ function openDetailsPanel(host) {
       vHeader.style.cssText = 'font-weight: 600; font-family: monospace; color: var(--danger); margin-bottom: 4px;';
       vHeader.textContent = `${v.id} (${v.severity.toUpperCase()})`;
       const vBody = document.createElement('div');
-      vBody.style.cssText = 'color: var(--text-muted); line-height: 1.4;';
-      // v.details is safely built in nmap module, but insert using DOM to pass linters
-      vBody.insertAdjacentHTML('beforeend', v.details.replace(/\n/g, '<br>'));
+      vBody.style.cssText = 'color: var(--text-muted); line-height: 1.4; white-space: pre-wrap;';
+      vBody.textContent = v.details;
       
       vDiv.appendChild(vHeader);
       vDiv.appendChild(vBody);
@@ -687,20 +1121,16 @@ function openDetailsPanel(host) {
   document.getElementById('btn-nmap-vuln').setAttribute('data-ip', host.ip);
   document.getElementById('btn-nmap-custom').setAttribute('data-ip', host.ip);
   document.getElementById('btn-run-ncat').setAttribute('data-ip', host.ip);
-  document.getElementById('nse-search-input').placeholder = `Search ${state.nmapScripts.length} scripts (e.g. smb-)`;
+  document.getElementById('nse-search-input').placeholder = `Search ${state.nmapScripts?.length || 0} scripts (e.g. smb-)`;
 
-  if (savedDeepScanHtml) {
-    document.getElementById('deep-scan-results').insertAdjacentHTML('beforeend', savedDeepScanHtml);
-  }
-  
-  const savedNmapHtml = getSavedNmapHtml(host);
-  if (savedNmapHtml) {
-    document.getElementById('nmap-scan-results').insertAdjacentHTML('beforeend', savedNmapHtml);
-  }
+  renderSavedHistory(host);
   elements.detailsPanel.classList.add('open');
   elements.sidebarResizer.style.display = 'block';
 
   attachDetailsPanelListeners(host);
+  
+  // Re-apply settings to hide Nmap buttons if disabled
+  window.electronAPI.settings.getAll().then(settings => applySettingsUI(settings));
 }
 
 function attachDetailsPanelListeners(host) {
@@ -831,7 +1261,17 @@ function attachDetailsPanelListeners(host) {
     let newBlock = document.createElement('div');
     newBlock.className = 'ds-record';
     newBlock.id = `nmap-live-${type}`;
-    newBlock.innerHTML = `<div class="ds-service">Live Nmap ${label}</div><div class="ds-banner" id="nmap-live-banner-${type}">Initializing...</div>`;
+    const labelDiv = document.createElement('div');
+    labelDiv.className = 'ds-service';
+    labelDiv.textContent = `Live Nmap ${label}`;
+    
+    const bannerDiv = document.createElement('div');
+    bannerDiv.className = 'ds-banner';
+    bannerDiv.id = `nmap-live-banner-${type}`;
+    bannerDiv.textContent = 'Initializing...';
+    
+    newBlock.appendChild(labelDiv);
+    newBlock.appendChild(bannerDiv);
     nmapScanResults.prepend(newBlock);
 
     await api.runNmapScan(type, type === 'port' ? `${host.ip}:${btn.getAttribute('data-port')}` : host.ip);
@@ -906,7 +1346,17 @@ function attachDetailsPanelListeners(host) {
         let newBlock = document.createElement('div');
         newBlock.className = 'ds-record';
         newBlock.id = `nmap-live-custom`;
-        newBlock.innerHTML = `<div class="ds-service">Live NSE Execution (${selectedNseScript})</div><div class="ds-banner" id="nmap-live-banner-custom">Initializing...</div>`;
+    const labelDiv = document.createElement('div');
+    labelDiv.className = 'ds-service';
+    labelDiv.textContent = `Live NSE Execution (${selectedNseScript})`;
+    
+    const bannerDiv = document.createElement('div');
+    bannerDiv.className = 'ds-banner';
+    bannerDiv.id = 'nmap-live-banner-custom';
+    bannerDiv.textContent = 'Initializing...';
+    
+    newBlock.appendChild(labelDiv);
+    newBlock.appendChild(bannerDiv);
         nmapScanResults.prepend(newBlock);
 
         await api.runNmapScan('custom', {
@@ -928,7 +1378,11 @@ function attachDetailsPanelListeners(host) {
           newBtn.id = btnId;
           newBtn.className = 'btn warning full-width';
           newBtn.setAttribute('data-port', port);
-          newBtn.innerHTML = `<span class="icon">🎯</span> Nmap specific port: ${port}`;
+          const iconSpan = document.createElement('span');
+          iconSpan.className = 'icon';
+          iconSpan.textContent = '🎯';
+          newBtn.appendChild(iconSpan);
+          newBtn.append(` Nmap specific port: ${port}`);
           newBtn.addEventListener('click', () => handleNmapScan(btnId, 'port', `Port ${port} Scan`));
           nmapActions.appendChild(newBtn);
        }
@@ -1419,39 +1873,58 @@ if (window.electronAPI) {
       record.style.background = 'rgba(235,94,94,0.05)';
     }
     
-    let bannerHtml = '';
-    if (data.rawBanner) {
-       // Escape basic HTML
-       const safeBanner = data.rawBanner.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-       bannerHtml = `<div class="ds-banner">${safeBanner}</div>`;
-    }
+    const headerNode = document.createElement('div');
+    headerNode.className = 'ds-header';
 
-    let actionTag = '';
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'ds-header-title';
+
+    const portSpan = document.createElement('span');
+    portSpan.className = 'ds-port';
+    portSpan.textContent = `PORT ${data.port}`;
+
+    const serviceSpan = document.createElement('span');
+    serviceSpan.className = 'ds-service';
+    serviceSpan.textContent = data.serviceName;
+
+    titleDiv.appendChild(portSpan);
+    titleDiv.appendChild(serviceSpan);
+
     if (data.vulnerable) {
-       const cl = data.severity === 'critical' ? 'danger' : 'warning';
-       actionTag = `<span style="font-size: 10px; color: var(--${cl}); border: 1px solid var(--${cl}); margin-left: 8px; padding: 2px 4px; border-radius: 2px;">${data.severity.toUpperCase()}</span>`;
+      const cl = data.severity === 'critical' ? 'danger' : 'warning';
+      const tag = document.createElement('span');
+      tag.style.cssText = `font-size: 10px; color: var(--${cl}); border: 1px solid var(--${cl}); margin-left: 8px; padding: 2px 4px; border-radius: 2px;`;
+      tag.textContent = data.severity.toUpperCase();
+      titleDiv.appendChild(tag);
     }
 
-    // Determine Action Buttons
-    let actionsHtml = '';
+    headerNode.appendChild(titleDiv);
+
+    const actionsContainer = document.createElement('div');
+    actionsContainer.className = 'ds-actions';
     const ip = document.getElementById('btn-run-deep-scan')?.getAttribute('data-ip');
-    
     if (ip) {
-      actionsHtml = getActionButtonsHtml(ip, data);
+      renderActionButtons(actionsContainer, ip, data);
     }
+    headerNode.appendChild(actionsContainer);
 
-    record.innerHTML = `
-      <div class="ds-header">
-        <div class="ds-header-title">
-          <span class="ds-port">PORT ${data.port}</span>
-          <span class="ds-service">${data.serviceName}</span>
-          ${actionTag}
-        </div>
-        ${actionsHtml}
-      </div>
-      <div class="ds-details" style="${data.vulnerable ? 'color: var(--danger); font-weight: 500;' : ''}">${data.details}</div>
-      ${bannerHtml}
-    `;
+    const detailsDiv = document.createElement('div');
+    detailsDiv.className = 'ds-details';
+    if (data.vulnerable) {
+      detailsDiv.style.color = 'var(--danger)';
+      detailsDiv.style.fontWeight = '500';
+    }
+    detailsDiv.textContent = data.details;
+
+    record.appendChild(headerNode);
+    record.appendChild(detailsDiv);
+
+    if (data.rawBanner) {
+      const bannerDiv = document.createElement('div');
+      bannerDiv.className = 'ds-banner';
+      bannerDiv.textContent = data.rawBanner;
+      record.appendChild(bannerDiv);
+    }
     
     dsResults.appendChild(record);
   });
@@ -1535,8 +2008,7 @@ if (window.electronAPI) {
     const bannerBlock = document.getElementById(`nmap-live-banner-${type}`);
     if (bannerBlock) {
       if (bannerBlock.innerText === 'Initializing...') bannerBlock.innerText = '';
-      const safeChunk = chunk.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      bannerBlock.innerHTML += safeChunk;
+      bannerBlock.textContent += chunk;
     }
   });
 
@@ -1794,7 +2266,7 @@ if (window.electronAPI) {
 
       if (wasCancelled) {
         const bannerBlock = document.getElementById(`nmap-live-banner-${type}`);
-        if (bannerBlock) bannerBlock.innerHTML += '\n\n[DISCONNECTED]';
+        if (bannerBlock) bannerBlock.textContent += '\n\n[DISCONNECTED]';
       }
     }
 
@@ -1808,7 +2280,7 @@ if (window.electronAPI) {
     const type = data.type;
     const bannerBlock = document.getElementById(`nmap-live-banner-${type}`);
     if (bannerBlock) {
-       bannerBlock.innerHTML += `\n\n[ERROR]: ${data.error}`;
+       bannerBlock.textContent += `\n\n[ERROR]: ${data.error}`;
     }
     
     const target = data.target;

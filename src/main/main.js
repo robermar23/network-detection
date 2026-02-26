@@ -24,8 +24,9 @@ import { runDeepScan, cancelDeepScan } from './deepScanner.js';
 import { checkNmapInstalled, runNmapScan, cancelNmapScan, runNcat, getNmapScripts } from './nmapScanner.js';
 import { createMainWindow } from './windowManager.js';
 import { parseNmapXml } from './nmapXmlParser.js';
-import { expandCIDR } from '#shared/networkConstants.js';
 import ping from 'ping';
+import { getSetting, setSetting, getAllSettings, checkDependency } from './store.js';
+import { startTsharkCapture, stopTsharkCapture } from './tsharkScanner.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -128,6 +129,27 @@ ipcMain.handle(IPC_CHANNELS.CHECK_NMAP, async () => {
   return await checkNmapInstalled();
 });
 
+// --- Settings Management ---
+
+ipcMain.handle(IPC_CHANNELS.GET_SETTING, (event, key) => {
+  return getSetting(key);
+});
+
+ipcMain.handle(IPC_CHANNELS.SET_SETTING, (event, { key, value }) => {
+  setSetting(key, value);
+  return { success: true };
+});
+
+ipcMain.handle(IPC_CHANNELS.GET_ALL_SETTINGS, () => {
+  return getAllSettings();
+});
+
+ipcMain.handle(IPC_CHANNELS.CHECK_DEPENDENCY, async (event, toolName) => {
+  return await checkDependency(toolName);
+});
+
+// --- Node Scanning & Execution ---
+
 ipcMain.handle(IPC_CHANNELS.RUN_NMAP_SCAN, async (event, payload) => {
   const { type, target } = payload;
   console.log(`Nmap scan requested: ${type} on ${typeof target === 'string' ? target : target.ip}`);
@@ -221,6 +243,30 @@ ipcMain.handle(IPC_CHANNELS.OPEN_EXTERNAL_ACTION, async (event, { type, ip, port
     console.error(`Failed to launch external command:`, err);
     return { success: false, error: err.message };
   }
+});
+
+// --- Tshark (VLAN Discovery) ---
+
+ipcMain.handle(IPC_CHANNELS.START_TSHARK, async (event, interfaceId) => {
+  console.log(`Starting Tshark on interface: ${interfaceId}`);
+  
+  startTsharkCapture(interfaceId, 
+    (vlanData) => {
+      if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.TSHARK_VLAN_FOUND, vlanData);
+    },
+    (errorData) => {
+      if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.TSHARK_ERROR, errorData);
+    },
+    (completeData) => {
+      if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.TSHARK_COMPLETE, completeData);
+    }
+  );
+  return { status: 'started' };
+});
+
+ipcMain.handle(IPC_CHANNELS.STOP_TSHARK, async () => {
+  const stopped = stopTsharkCapture();
+  return { status: stopped ? 'stopped' : 'not_running' };
 });
 
 ipcMain.handle(IPC_CHANNELS.SAVE_RESULTS, async (event, results) => {

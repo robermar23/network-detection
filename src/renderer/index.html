@@ -57,6 +57,10 @@
           <button id="btn-load" class="btn secondary">Load</button>
           <button id="btn-clear" class="btn secondary">Clear</button>
           <div class="divider"></div>
+          <button id="btn-settings" class="btn secondary" title="Settings">
+            <span class="icon">⚙️</span> Settings
+          </button>
+          <div class="divider"></div>
           <button id="btn-exit" class="btn danger-outline">Exit</button>
         </div>
       </div>
@@ -107,6 +111,11 @@
               </button>
             </div>
           </div>
+          <div class="divider"></div>
+          <button id="btn-toggle-vlan-panel" class="btn secondary tshark-only" title="VLAN Discovery"
+            style="display: none;">
+            <span class="icon">🦈</span> VLAN Discovery
+          </button>
           <div class="divider"></div>
           <div class="view-toggles"
             style="display: flex; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 2px; border: 1px solid var(--border-glass);">
@@ -162,6 +171,45 @@
 
       <!-- Resizer Handle -->
       <div id="sidebar-resizer" class="resizer" style="display: none;"></div>
+
+      <!-- VLAN Discovery Panel -->
+      <aside id="vlan-panel" class="details-panel glass-panel" style="width: 380px; display: none;">
+        <div class="panel-header"
+          style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px; margin-bottom: 16px;">
+          <h2 style="font-size: 16px; font-weight: 500; margin: 0; color: white;">🦈 VLAN Discovery</h2>
+          <button id="btn-close-vlan-panel" class="btn icon-only" title="Hide Panel"
+            style="color: var(--text-muted); padding: 4px;">✕</button>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px;">
+          <p style="font-size: 12px; color: var(--text-muted); line-height: 1.4; margin: 0;">
+            Passively listen for 802.1Q tagged frames (VLAN Hopping / Misconfigured Trunks).
+          </p>
+          <div style="display: flex; gap: 8px;">
+            <select id="vlan-interface-select" class="dropdown-select" style="flex-grow: 1;">
+              <option value="">Select Interface...</option>
+            </select>
+            <button id="btn-refresh-vlan-interfaces" class="btn secondary icon-only"
+              title="Refresh Interfaces">🔄</button>
+          </div>
+          <button id="btn-start-vlan-capture" class="btn primary full-width">
+            <span class="icon">▶️</span> Start Capture
+          </button>
+        </div>
+
+        <div style="border-top: 1px solid var(--border-glass); padding-top: 16px;">
+          <h3 style="font-size: 13px; font-weight: 500; margin: 0 0 8px 0; color: white;">Detected Tags (<span
+              id="vlan-count">0</span>)</h3>
+          <div id="vlan-results-container"
+            style="display: flex; flex-direction: column; gap: 8px; max-height: 400px; overflow-y: auto;">
+            <!-- VLAN tags will stream here -->
+            <div class="ds-record" style="text-align:center; color: var(--text-muted); opacity: 0.7;"
+              id="vlan-empty-state">
+              Waiting for capture to start...
+            </div>
+          </div>
+        </div>
+      </aside>
 
       <!-- Host Details Side Panel -->
       <aside id="details-panel" class="details-panel glass-panel">
@@ -300,6 +348,54 @@
       <div class="modal-footer">
         <span id="blacklist-count" class="pending-count">0 entries</span>
         <button id="btn-blacklist-done" class="btn primary">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal-overlay" class="modal-overlay hidden">
+    <div class="modal-content settings-modal">
+      <div class="modal-header">
+        <h2>⚙️ Settings</h2>
+        <button id="btn-close-settings-modal" class="btn icon-only modal-close">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+
+        <!-- Nmap Settings Group -->
+        <div class="settings-group">
+          <div class="settings-group-header">
+            <h3><span class="icon">🖥️</span> Nmap Integration</h3>
+            <label class="toggle-switch">
+              <input type="checkbox" id="setting-nmap-enabled">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <p class="settings-description">Enables advanced host discovery, OS fingerprinting, and vulnerability
+            scanning.</p>
+          <div class="dependency-status" id="status-nmap">
+            <span class="status-dot"></span> <span class="status-text">Checking availability...</span>
+          </div>
+        </div>
+
+        <!-- Tshark Settings Group -->
+        <div class="settings-group">
+          <div class="settings-group-header">
+            <h3><span class="icon">🦈</span> Tshark (Wireshark) Integration</h3>
+            <label class="toggle-switch">
+              <input type="checkbox" id="setting-tshark-enabled">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <p class="settings-description">Enables passive raw packet capture features like VLAN Hop detection. Requires
+            Npcap or WinPcap.</p>
+          <div class="dependency-status" id="status-tshark">
+            <span class="status-dot"></span> <span class="status-text">Checking availability...</span>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button id="btn-settings-done" class="btn primary">Save & Close</button>
       </div>
     </div>
   </div>

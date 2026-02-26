@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.6.0](https://github.com/robermar23/netspectre/compare/v1.5.0...v1.6.0) (2026-02-26)
+
+
+### Features
+
+* Implement Tshark integration, settings management ([183a367](https://github.com/robermar23/netspectre/commit/183a367c30535fa0aa5196aa87a7b307e9da0931))
+* Implement Tshark integration, settings management ([b3edd4f](https://github.com/robermar23/netspectre/commit/b3edd4f74b790ffd7915362afa814dfe9a6b4f96))
+
+
+### Bug Fixes
+
+* **renderer:** address XSS security vulnerabilities in index.js ([0152c27](https://github.com/robermar23/netspectre/commit/0152c2785e2cb2702ee95bbed1f51edd307997a4))
+* **renderer:** replace unsafe innerHTML with DOM manipulation ([b30b6d7](https://github.com/robermar23/netspectre/commit/b30b6d70ac6e5ad49433374cc40fc3ca71053a0c))
+
 ## [1.5.0](https://github.com/robermar23/netspectre/compare/v1.4.3...v1.5.0) (2026-02-25)
 
 

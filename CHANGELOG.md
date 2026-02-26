@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.7.0](https://github.com/robermar23/netspectre/compare/v1.6.0...v1.7.0) (2026-02-26)
+
+
+### Features
+
+* add ci run that run all tests ([bf7c495](https://github.com/robermar23/netspectre/commit/bf7c4958b9c6e945c32adb048301599067f0bf73))
+
+
+### Bug Fixes
+
+* fix npm test command ([837d217](https://github.com/robermar23/netspectre/commit/837d217f06ad601e21cdc71375302a13347a5e38))
+
 ## [1.6.0](https://github.com/robermar23/netspectre/compare/v1.5.0...v1.6.0) (2026-02-26)
 
 

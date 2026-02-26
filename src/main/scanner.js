@@ -128,7 +128,7 @@ function getArpTable() {
         let match = line.match(/(\d+\.\d+\.\d+\.\d+)\s+([0-9a-fA-F-]+)\s+/);
         if (!match) {
           // Linux/Mac format matching
-          match = line.match(/(\d+\.\d+\.\d+\.\d+).*?([0-9a-fA-F:]+)/);
+          match = line.match(/(\d+\.\d+\.\d+\.\d+).*?([0-9a-fA-F]{1,2}(?::[0-9a-fA-F]{1,2}){5})/);
         }
         
         if (match) {

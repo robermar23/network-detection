@@ -9,5 +9,5 @@ description: Generate a commit message from staged git changes
    - Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
    - Keep the first line under 50 characters if possible.
    - Provide a more detailed body if the changes are complex.
-   - Keep any references to files relative to the app, not the file system
+   - When referencing files, use only the basename (e.g., `scanner.js` not `src/main/scanner.js`)
 4. Provide the generated commit message to the user for review.

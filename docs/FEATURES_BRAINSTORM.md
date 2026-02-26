@@ -20,7 +20,7 @@ As a modern Electron/Node.js application, NetSpecter can leverage advanced web t
 
 Deepening the application's understanding of Layer 2 and Layer 3 topologies to provide holistic network visibility.
 
-*   **VLAN Hopping & Tag Detection:** Detect misconfigured trunk ports and attempt to identify 802.1Q VLAN tags traversing the wire.
+COMPLETED   **VLAN Hopping & Tag Detection:** Detect misconfigured trunk ports and attempt to identify 802.1Q VLAN tags traversing the wire.
 *   **SNMP Walking & MIB Parsing:** Full integration for SNMPv1/v2c/v3. Automatically walk target devices to pull routing tables, interface statistics, and exact hardware firmware versions.
 *   **Topology Mapping (Graph View):** Transform the flat list dashboard into an interactive visual topology map (using D3.js or Cytoscape) showing routers, switches, endpoints, and their logical subnets.
 *   **PCAP Packet Capture & Analysis:** Integrate `libpcap` bindings. Allow users to right-click a host and run a live 60-second Wireshark-like packet capture to detect cleartext credentials or anomalous traffic.

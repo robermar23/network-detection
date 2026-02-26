@@ -44,13 +44,20 @@ export async function checkDependency(toolName) {
     commandsToCheck = [
       { cmd: 'nmap -V', path: 'nmap' }, // Check global PATH first
       { cmd: '"C:\\Program Files (x86)\\Nmap\\nmap.exe" -V', path: 'C:\\Program Files (x86)\\Nmap\\nmap.exe' },
-      { cmd: '"C:\\Program Files\\Nmap\\nmap.exe" -V', path: 'C:\\Program Files\\Nmap\\nmap.exe' }
+      { cmd: '"C:\\Program Files\\Nmap\\nmap.exe" -V', path: 'C:\\Program Files\\Nmap\\nmap.exe' },
+      // macOS common paths
+      { cmd: '/opt/homebrew/bin/nmap -V', path: '/opt/homebrew/bin/nmap' },
+      { cmd: '/usr/local/bin/nmap -V', path: '/usr/local/bin/nmap' }
     ];
   } else if (toolName === 'tshark') {
     commandsToCheck = [
       { cmd: 'tshark -v', path: 'tshark' }, // Check global PATH first
       { cmd: '"C:\\Program Files\\Wireshark\\tshark.exe" -v', path: 'C:\\Program Files\\Wireshark\\tshark.exe' },
-      { cmd: '"C:\\Program Files (x86)\\Wireshark\\tshark.exe" -v', path: 'C:\\Program Files (x86)\\Wireshark\\tshark.exe' }
+      { cmd: '"C:\\Program Files (x86)\\Wireshark\\tshark.exe" -v', path: 'C:\\Program Files (x86)\\Wireshark\\tshark.exe' },
+      // macOS common paths
+      { cmd: '/opt/homebrew/bin/tshark -v', path: '/opt/homebrew/bin/tshark' },
+      { cmd: '/usr/local/bin/tshark -v', path: '/usr/local/bin/tshark' },
+      { cmd: '/Applications/Wireshark.app/Contents/MacOS/tshark -v', path: '/Applications/Wireshark.app/Contents/MacOS/tshark' }
     ];
   } else {
     throw new Error(`Unknown tool: ${toolName}`);

@@ -197,6 +197,18 @@ The only scenario justifying a split would be **separate commercial licensing** 
 
 ---
 
+## 🕵️ 8. Passive Network Intelligence (Tshark/Wireshark)
+
+With `tshark` now integrated as a core backend dependency for raw packet capture, NetSpecter can evolve beyond active (noisy) scanning into stealthy, passive network intelligence gathering.
+
+* **Rogue DHCP Detection (Active/Passive):** Listen globally for `DHCP Offer` and `DHCP Ack` packets (`tshark -Y "dhcp"`). Alert the user immediately if an unknown IP address or MAC address starts handing out leases or malicious DNS server routes.
+* **Cleartext Credential Sniffing:** Automatically filter for and extract usernames and passwords traversing the wire in plain text on insecure protocols: FTP (Port 21), Telnet (Port 23), HTTP Basic Auth, and POP3/IMAP.
+* **DNS Query Harvesting (Passive Host Discovery):** Instead of actively pinging subnets, silently listen to broadcast DNS and mDNS (Bonjour/Avahi) queries (`tshark -Y "dns or mdns"`). Build a list of active hostnames and IP addresses completely invisibly without triggering IDS/IPS systems.
+* **Live PCAP Exporting:** Allow a user to right-click an interface or a specific host and generate a standard `.pcap` file of all traffic related to that IP, which they can later open directly in Wireshark for deep forensic dissection.
+* **ARP Spoofing Detection:** Monitor the local network for gratuitous ARP replies or rapid MAC address changes for the default gateway, violently alerting the user if a Man-in-the-Middle attack is actively occurring on their subnet.
+
+---
+
 ## 📋 Summary of Value Proposition
 
 By implementing these features, **NetSpecter** transitions from a simple *discovery* scanner into a **comprehensive Network Operations and Security Auditing Platform**. Combined with Burp Suite-class web application testing under a single multi-workspace UI, it would allow engineers to completely replace disjointed CLI tools (Nmap, Nikto, DirBuster, Wireshark, SNMPwalk, Burp, ffuf, sqlmap) with a single, visually appealing, and highly efficient desktop application spanning both **network-layer** and **application-layer** security testing.

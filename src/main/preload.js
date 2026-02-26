@@ -10,6 +10,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   clearResults: () => ipcRenderer.invoke(IPC_CHANNELS.CLEAR_RESULTS),
   exitApp: () => ipcRenderer.send(IPC_CHANNELS.EXIT_APP),
 
+  // Settings Management
+  settings: {
+    get: (key) => ipcRenderer.invoke(IPC_CHANNELS.GET_SETTING, key),
+    set: (key, value) => ipcRenderer.invoke(IPC_CHANNELS.SET_SETTING, { key, value }),
+    getAll: () => ipcRenderer.invoke(IPC_CHANNELS.GET_ALL_SETTINGS),
+    checkDependency: (toolName) => ipcRenderer.invoke(IPC_CHANNELS.CHECK_DEPENDENCY, toolName)
+  },
+
   // Deep Scan Triggers
   runDeepScan: (ip) => ipcRenderer.invoke(IPC_CHANNELS.RUN_DEEP_SCAN, ip),
   cancelDeepScan: (ip) => ipcRenderer.invoke(IPC_CHANNELS.CANCEL_DEEP_SCAN, ip),
@@ -27,6 +35,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   importNmapXml: () => ipcRenderer.invoke(IPC_CHANNELS.IMPORT_NMAP_XML),
   pingHost: (ip) => ipcRenderer.invoke(IPC_CHANNELS.PING_HOST, ip),
   probeHost: (ip) => ipcRenderer.invoke(IPC_CHANNELS.PROBE_HOST, ip),
+  
+  // Tshark (VLAN Discovery)
+  startTsharkCapture: (interfaceId) => ipcRenderer.invoke(IPC_CHANNELS.START_TSHARK, interfaceId),
+  stopTsharkCapture: () => ipcRenderer.invoke(IPC_CHANNELS.STOP_TSHARK),
+  onTsharkVlanFound: (callback) => ipcRenderer.on(IPC_CHANNELS.TSHARK_VLAN_FOUND, (_event, value) => callback(value)),
+  onTsharkError: (callback) => ipcRenderer.on(IPC_CHANNELS.TSHARK_ERROR, (_event, value) => callback(value)),
+  onTsharkComplete: (callback) => ipcRenderer.on(IPC_CHANNELS.TSHARK_COMPLETE, (_event, value) => callback(value)),
 
   // Event Listeners for streams
   onHostFound: (callback) => ipcRenderer.on(IPC_CHANNELS.HOST_FOUND, (_event, value) => callback(value)),
@@ -54,5 +69,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners(IPC_CHANNELS.NMAP_SCAN_RESULT);
     ipcRenderer.removeAllListeners(IPC_CHANNELS.NMAP_SCAN_COMPLETE);
     ipcRenderer.removeAllListeners(IPC_CHANNELS.NMAP_SCAN_ERROR);
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.TSHARK_VLAN_FOUND);
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.TSHARK_ERROR);
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.TSHARK_COMPLETE);
   }
 });

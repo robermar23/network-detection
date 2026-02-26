@@ -18,5 +18,17 @@ export const api = {
   importScopeFile: async () => window.electronAPI.importScopeFile(),
   importNmapXml: async () => window.electronAPI.importNmapXml(),
   pingHost: async (ip) => window.electronAPI.pingHost(ip),
-  probeHost: async (ip) => window.electronAPI.probeHost(ip)
+  probeHost: async (ip) => window.electronAPI.probeHost(ip),
+  
+  // Settings
+  settings: {
+    get: async (key) => window.electronAPI.settings.get(key),
+    set: async (key, value) => window.electronAPI.settings.set(key, value),
+    getAll: async () => window.electronAPI.settings.getAll(),
+    checkDependency: async (toolName) => window.electronAPI.settings.checkDependency(toolName)
+  },
+  
+  // Tshark (VLAN Discovery)
+  startTsharkCapture: async (interfaceId) => window.electronAPI.startTsharkCapture(interfaceId),
+  stopTsharkCapture: async () => window.electronAPI.stopTsharkCapture()
 };

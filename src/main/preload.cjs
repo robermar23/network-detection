@@ -34,7 +34,18 @@ var IPC_CHANNELS = {
   IMPORT_SCOPE_FILE: "import-scope-file",
   IMPORT_NMAP_XML: "import-nmap-xml",
   PING_HOST: "ping-host",
-  PROBE_HOST: "probe-host"
+  PROBE_HOST: "probe-host",
+  // Settings Management
+  GET_SETTING: "get-setting",
+  SET_SETTING: "set-setting",
+  GET_ALL_SETTINGS: "get-all-settings",
+  CHECK_DEPENDENCY: "check-dependency",
+  // Tshark (VLAN Discovery)
+  START_TSHARK: "start-tshark",
+  STOP_TSHARK: "stop-tshark",
+  TSHARK_VLAN_FOUND: "tshark-vlan-found",
+  TSHARK_ERROR: "tshark-error",
+  TSHARK_COMPLETE: "tshark-complete"
 };
 
 // src/main/preload.js
@@ -46,6 +57,13 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
   loadResults: () => import_electron.ipcRenderer.invoke(IPC_CHANNELS.LOAD_RESULTS),
   clearResults: () => import_electron.ipcRenderer.invoke(IPC_CHANNELS.CLEAR_RESULTS),
   exitApp: () => import_electron.ipcRenderer.send(IPC_CHANNELS.EXIT_APP),
+  // Settings Management
+  settings: {
+    get: (key) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.GET_SETTING, key),
+    set: (key, value) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.SET_SETTING, { key, value }),
+    getAll: () => import_electron.ipcRenderer.invoke(IPC_CHANNELS.GET_ALL_SETTINGS),
+    checkDependency: (toolName) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.CHECK_DEPENDENCY, toolName)
+  },
   // Deep Scan Triggers
   runDeepScan: (ip) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.RUN_DEEP_SCAN, ip),
   cancelDeepScan: (ip) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.CANCEL_DEEP_SCAN, ip),
@@ -61,6 +79,12 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
   importNmapXml: () => import_electron.ipcRenderer.invoke(IPC_CHANNELS.IMPORT_NMAP_XML),
   pingHost: (ip) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.PING_HOST, ip),
   probeHost: (ip) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.PROBE_HOST, ip),
+  // Tshark (VLAN Discovery)
+  startTsharkCapture: (interfaceId) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.START_TSHARK, interfaceId),
+  stopTsharkCapture: () => import_electron.ipcRenderer.invoke(IPC_CHANNELS.STOP_TSHARK),
+  onTsharkVlanFound: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.TSHARK_VLAN_FOUND, (_event, value) => callback(value)),
+  onTsharkError: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.TSHARK_ERROR, (_event, value) => callback(value)),
+  onTsharkComplete: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.TSHARK_COMPLETE, (_event, value) => callback(value)),
   // Event Listeners for streams
   onHostFound: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.HOST_FOUND, (_event, value) => callback(value)),
   onScanComplete: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.SCAN_COMPLETE, (_event, value) => callback(value)),
@@ -84,5 +108,8 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.NMAP_SCAN_RESULT);
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.NMAP_SCAN_COMPLETE);
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.NMAP_SCAN_ERROR);
+    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.TSHARK_VLAN_FOUND);
+    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.TSHARK_ERROR);
+    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.TSHARK_COMPLETE);
   }
 });

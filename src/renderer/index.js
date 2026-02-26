@@ -22,7 +22,7 @@ api.checkNmap().then(async (installed) => {
     elements.nmapInstallBanner.style.display = 'block';
   } else {
     state.nmapScripts = await api.getNmapScripts();
-    console.log(`Loaded ${state.nmapScripts.length} native Nmap scripts from backend.`);
+    console.log(`Loaded ${state.nmapScripts?.length || 0} native Nmap scripts from backend.`);
     // Reveal Nmap scan-all options
     document.querySelectorAll('.scan-all-option.nmap-only').forEach(el => {
       el.style.display = 'flex';
@@ -33,6 +33,105 @@ api.checkNmap().then(async (installed) => {
 elements.btnCloseNmapBanner.addEventListener('click', () => {
   elements.nmapInstallBanner.style.display = 'none';
 });
+
+// --- Settings Modal Logic ---
+// --- Settings Modal Logic ---
+const btnSettings = document.getElementById('btn-settings');
+const settingsModalOverlay = document.getElementById('settings-modal-overlay');
+const btnCloseSettingsModal = document.getElementById('btn-close-settings-modal');
+const btnSettingsDone = document.getElementById('btn-settings-done');
+
+// Settings DOM elements
+const toggleNmap = document.getElementById('setting-nmap-enabled');
+const statusNmap = document.getElementById('status-nmap');
+const toggleTshark = document.getElementById('setting-tshark-enabled');
+const statusTshark = document.getElementById('status-tshark');
+const vlanPanelToggleBtn = document.getElementById('btn-toggle-vlan-panel');
+
+async function loadAndApplySettings() {
+  const settings = await api.settings.getAll();
+  
+  // Nmap logic
+  const nmapInstalled = await api.checkNmap();
+  statusNmap.textContent = nmapInstalled ? 'Installed' : 'Not Found inside PATH';
+  statusNmap.className = nmapInstalled ? 'status-text success' : 'status-text danger';
+  
+  const nmapEnabled = settings.nmap?.enabled !== false; // default true
+  toggleNmap.checked = nmapEnabled;
+  if (!nmapInstalled && nmapEnabled) {
+    toggleNmap.checked = false;
+    toggleNmap.disabled = true;
+    api.settings.set('nmap.enabled', false);
+  }
+
+  // Tshark logic
+  const tsharkCheck = await api.settings.checkDependency('tshark');
+  const tsharkInstalled = tsharkCheck.installed;
+  statusTshark.textContent = tsharkInstalled ? 'Installed' : 'Not Found inside PATH';
+  statusTshark.className = tsharkInstalled ? 'status-text success' : 'status-text danger';
+
+  const tsharkEnabled = settings.tshark?.enabled !== false; // default true
+  toggleTshark.checked = tsharkEnabled;
+  if (!tsharkInstalled && tsharkEnabled) {
+    toggleTshark.checked = false;
+    toggleTshark.disabled = true;
+    api.settings.set('tshark.enabled', false);
+  }
+
+  applySettingsUI(settings);
+}
+
+function applySettingsUI(settings) {
+  // Hide/Show Nmap UI components globally
+  const nmapEnabled = settings.nmap?.enabled !== false;
+  document.querySelectorAll('.nmap-only').forEach(el => {
+    el.style.display = nmapEnabled ? 'flex' : 'none';
+  });
+
+  // Hide/Show Tshark UI components globally
+  const tsharkEnabled = settings.tshark?.enabled !== false;
+  document.querySelectorAll('.tshark-only').forEach(el => {
+    el.style.display = tsharkEnabled ? 'flex' : 'none';
+  });
+
+  if (!tsharkEnabled && vlanPanel) {
+     vlanPanel.style.display = 'none';
+     if (elements.detailsPanel.classList.contains('open')) {
+        elements.sidebarResizer.style.display = 'block';
+     } else {
+        elements.sidebarResizer.style.display = 'none';
+     }
+  }
+}
+
+toggleNmap.addEventListener('change', async (e) => {
+  await api.settings.set('nmap.enabled', e.target.checked);
+  const settings = await api.settings.getAll();
+  applySettingsUI(settings);
+});
+
+toggleTshark.addEventListener('change', async (e) => {
+  await api.settings.set('tshark.enabled', e.target.checked);
+  const settings = await api.settings.getAll();
+  applySettingsUI(settings);
+});
+
+
+btnSettings.addEventListener('click', () => {
+  loadAndApplySettings();
+  settingsModalOverlay.classList.remove('hidden');
+});
+
+btnCloseSettingsModal.addEventListener('click', () => {
+  settingsModalOverlay.classList.add('hidden');
+});
+
+btnSettingsDone.addEventListener('click', () => {
+  settingsModalOverlay.classList.add('hidden');
+});
+
+// Run once on boot
+loadAndApplySettings();
 
 // --- View Toggles ---
 elements.btnViewGrid.addEventListener('click', () => { state.currentView = 'grid'; domUtils.applyViewStyle(state); });
@@ -455,6 +554,181 @@ elements.blacklistInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') elements.btnBlacklistAdd.click();
 });
 
+// =============================================
+// === VLAN DISCOVERY MODULE ===
+// =============================================
+
+let isVlanCapturing = false;
+let vlanTagsDetected = new Set();
+
+const btnToggleVlanPanel = document.getElementById('btn-toggle-vlan-panel');
+const vlanPanel = document.getElementById('vlan-panel');
+const btnCloseVlanPanel = document.getElementById('btn-close-vlan-panel');
+const vlanInterfaceSelect = document.getElementById('vlan-interface-select');
+const btnRefreshVlanInterfaces = document.getElementById('btn-refresh-vlan-interfaces');
+const btnStartVlanCapture = document.getElementById('btn-start-vlan-capture');
+const vlanCountSpan = document.getElementById('vlan-count');
+const vlanResultsContainer = document.getElementById('vlan-results-container');
+const vlanEmptyState = document.getElementById('vlan-empty-state');
+
+btnToggleVlanPanel.addEventListener('click', async () => {
+  if (vlanPanel.style.display === 'none' || !vlanPanel.classList.contains('open')) {
+    // Close details panel if open
+    if (elements.detailsPanel.classList.contains('open')) {
+       elements.detailsPanel.classList.remove('open');
+    }
+    
+    vlanPanel.style.display = 'flex';
+    // Small timeout to allow display: flex to render before animating opacity via .open
+    setTimeout(() => vlanPanel.classList.add('open'), 10);
+    elements.sidebarResizer.style.display = 'block';
+    await refreshVlanInterfaces();
+  } else {
+    vlanPanel.classList.remove('open');
+    setTimeout(() => vlanPanel.style.display = 'none', 300); // Wait for CSS transition
+    if (!elements.detailsPanel.classList.contains('open')) {
+       elements.sidebarResizer.style.display = 'none';
+    }
+  }
+});
+
+btnCloseVlanPanel.addEventListener('click', () => {
+  vlanPanel.classList.remove('open');
+  setTimeout(() => vlanPanel.style.display = 'none', 300);
+  if (!elements.detailsPanel.classList.contains('open')) {
+     elements.sidebarResizer.style.display = 'none';
+  }
+});
+
+btnRefreshVlanInterfaces.addEventListener('click', refreshVlanInterfaces);
+
+btnStartVlanCapture.addEventListener('click', async () => {
+  if (isVlanCapturing) {
+    // Stop Capture
+    const res = await api.stopTsharkCapture();
+    if (res.status === 'stopped') {
+      isVlanCapturing = false;
+      btnStartVlanCapture.innerHTML = `<span class="icon">▶️</span> Start Capture`;
+      btnStartVlanCapture.classList.remove('danger', 'pulsing');
+      btnStartVlanCapture.classList.add('primary');
+      vlanInterfaceSelect.disabled = false;
+      btnRefreshVlanInterfaces.disabled = false;
+    }
+  } else {
+    // Start Capture
+    const iface = vlanInterfaceSelect.value;
+    if (!iface) {
+       alert('Please select a network interface first.');
+       return;
+    }
+    
+    vlanResultsContainer.innerHTML = ''; // clear old
+    if(vlanEmptyState) vlanEmptyState.style.display = 'none';
+    vlanTagsDetected.clear();
+    vlanCountSpan.textContent = '0';
+    
+    const res = await api.startTsharkCapture(iface);
+    if (res.status === 'started') {
+      isVlanCapturing = true;
+      btnStartVlanCapture.innerHTML = `<span class="icon">🛑</span> Stop Capture`;
+      btnStartVlanCapture.classList.remove('primary');
+      btnStartVlanCapture.classList.add('danger', 'pulsing');
+      vlanInterfaceSelect.disabled = true;
+      btnRefreshVlanInterfaces.disabled = true;
+    }
+  }
+});
+
+async function refreshVlanInterfaces() {
+  btnRefreshVlanInterfaces.disabled = true;
+  vlanInterfaceSelect.innerHTML = '<option value="">Loading...</option>';
+  try {
+    const interfaces = await api.getInterfaces();
+    vlanInterfaceSelect.innerHTML = '<option value="">Select Interface...</option>';
+    interfaces.forEach(iface => {
+      const opt = document.createElement('option');
+      opt.value = iface.name; 
+      opt.textContent = `${iface.name} (${iface.ip})`;
+      vlanInterfaceSelect.appendChild(opt);
+    });
+  } catch (e) {
+    vlanInterfaceSelect.innerHTML = '<option value="">Error Loading</option>';
+  } finally {
+    btnRefreshVlanInterfaces.disabled = false;
+  }
+}
+
+// Tshark Event Handlers
+window.electronAPI.onTsharkVlanFound((data) => {
+  console.log('VLAN tag found:', data);
+  const key = `vlan-${data.vlan}`;
+  
+  if (!vlanTagsDetected.has(data.vlan)) {
+    vlanTagsDetected.add(data.vlan);
+    vlanCountSpan.textContent = vlanTagsDetected.size;
+    
+    const el = document.createElement('div');
+    el.className = 'ds-record selectable-text';
+    el.id = key;
+    el.style.borderLeftColor = 'var(--info)';
+    el.innerHTML = `
+      <div class="ds-header" style="align-items: center;">
+        <div class="ds-header-title">
+          <span class="ds-port selectable-text">VLAN ${data.vlan}</span>
+          <span class="ds-service" style="margin-left: 8px;">802.1Q Tag</span>
+        </div>
+        <button class="btn icon-only copy-vlan" title="Copy to clipboard" data-vlan="${data.vlan}" data-src="${data.srcMac}" data-dst="${data.dstMac}">
+          📋
+        </button>
+      </div>
+      <div class="ds-details" style="font-size: 11px; margin-top: 4px;">
+        Captured between <span class="selectable-text" style="font-family:monospace">${data.srcMac}</span> and <span class="selectable-text" style="font-family:monospace">${data.dstMac}</span>
+      </div>
+    `;
+    vlanResultsContainer.appendChild(el);
+
+    // Attach copy event listener explicitly to this new button
+    const copyBtn = el.querySelector('.copy-vlan');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+         const textToCopy = `VLAN ID: ${data.vlan}\nSource MAC: ${data.srcMac}\nDest MAC: ${data.dstMac}`;
+         navigator.clipboard.writeText(textToCopy);
+         const originalText = copyBtn.innerText;
+         copyBtn.innerText = '✔️';
+         setTimeout(() => { copyBtn.innerText = originalText; }, 2000);
+      });
+    }
+  }
+});
+
+window.electronAPI.onTsharkError((err) => {
+  const el = document.createElement('div');
+  el.className = 'ds-record';
+  el.style.borderLeftColor = 'var(--danger)';
+  el.innerHTML = `
+    <div style="color: var(--danger); font-size: 12px; font-weight: bold;">Capture Error</div>
+    <div style="color: var(--text-muted); font-size: 11px; margin-top: 4px; white-space: pre-wrap;">${err}</div>
+  `;
+  vlanResultsContainer.appendChild(el);
+});
+
+window.electronAPI.onTsharkComplete(({ code }) => {
+  isVlanCapturing = false;
+  btnStartVlanCapture.innerHTML = `<span class="icon">▶️</span> Start Capture`;
+  btnStartVlanCapture.classList.remove('danger', 'pulsing');
+  btnStartVlanCapture.classList.add('primary');
+  vlanInterfaceSelect.disabled = false;
+  btnRefreshVlanInterfaces.disabled = false;
+  
+  const el = document.createElement('div');
+  el.style.textAlign = 'center';
+  el.style.color = 'var(--text-muted)';
+  el.style.fontSize = '11px';
+  el.style.marginTop = '8px';
+  el.textContent = `Capture ended (Code ${code})`;
+  vlanResultsContainer.appendChild(el);
+});
+
 // --- Details Panel Logic ---
 function getActionButtonsHtml(ip, data) {
   let actionsHtml = '';
@@ -687,7 +961,7 @@ function openDetailsPanel(host) {
   document.getElementById('btn-nmap-vuln').setAttribute('data-ip', host.ip);
   document.getElementById('btn-nmap-custom').setAttribute('data-ip', host.ip);
   document.getElementById('btn-run-ncat').setAttribute('data-ip', host.ip);
-  document.getElementById('nse-search-input').placeholder = `Search ${state.nmapScripts.length} scripts (e.g. smb-)`;
+  document.getElementById('nse-search-input').placeholder = `Search ${state.nmapScripts?.length || 0} scripts (e.g. smb-)`;
 
   if (savedDeepScanHtml) {
     document.getElementById('deep-scan-results').insertAdjacentHTML('beforeend', savedDeepScanHtml);
@@ -701,6 +975,9 @@ function openDetailsPanel(host) {
   elements.sidebarResizer.style.display = 'block';
 
   attachDetailsPanelListeners(host);
+  
+  // Re-apply settings to hide Nmap buttons if disabled
+  window.electronAPI.settings.getAll().then(settings => applySettings(settings));
 }
 
 function attachDetailsPanelListeners(host) {

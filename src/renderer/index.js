@@ -813,23 +813,48 @@ window.electronAPI.onTsharkComplete(({ code }) => {
 });
 
 // --- Details Panel Logic ---
-function getActionButtonsHtml(ip, data) {
-  let actionsHtml = '';
+function renderActionButtons(container, ip, data) {
   if (data.port === 80 || data.port === 8080) {
-    actionsHtml = `<button class="btn-action" onclick="window.electronAPI.openExternalAction({type:'http', ip:'${ip}', port:${data.port}})"><span class="icon">🌐</span> Open HTTP</button>`;
+    const btn = document.createElement('button');
+    btn.className = 'btn-action';
+    btn.innerHTML = '<span class="icon">🌐</span> Open HTTP';
+    btn.addEventListener('click', () => window.electronAPI.openExternalAction({type:'http', ip, port: data.port}));
+    container.appendChild(btn);
   } else if (data.port === 443 || data.port === 8443) {
-    actionsHtml = `<button class="btn-action" onclick="window.electronAPI.openExternalAction({type:'https', ip:'${ip}', port:${data.port}})"><span class="icon">🔒</span> Open HTTPS</button>`;
+    const btn = document.createElement('button');
+    btn.className = 'btn-action';
+    btn.innerHTML = '<span class="icon">🔒</span> Open HTTPS';
+    btn.addEventListener('click', () => window.electronAPI.openExternalAction({type:'https', ip, port: data.port}));
+    container.appendChild(btn);
   } else if (data.port === 22) {
-    const inputId = `ssh-user-${ip.replace(/\./g, '-')}-${data.port}`;
-    actionsHtml = `
-      <div style="display:flex; gap: 4px; align-items: center;">
-        <input type="text" id="${inputId}" class="text-input" style="width: 70px; padding: 4px 6px; font-size: 11px;" placeholder="root" value="root" title="SSH Username">
-        <button class="btn-action" onclick="window.electronAPI.openExternalAction({type:'ssh', ip:'${ip}', username: document.getElementById('${inputId}').value || 'root'})"><span class="icon">⌨️</span> Connect SSH</button>
-      </div>`;
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'display:flex; gap: 4px; align-items: center;';
+    
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'text-input';
+    input.style.cssText = 'width: 70px; padding: 4px 6px; font-size: 11px;';
+    input.placeholder = 'root';
+    input.value = 'root';
+    input.title = 'SSH Username';
+    
+    const btn = document.createElement('button');
+    btn.className = 'btn-action';
+    btn.innerHTML = '<span class="icon">⌨️</span> Connect SSH';
+    btn.addEventListener('click', () => {
+      window.electronAPI.openExternalAction({type:'ssh', ip, username: input.value || 'root'});
+    });
+    
+    wrapper.appendChild(input);
+    wrapper.appendChild(btn);
+    container.appendChild(wrapper);
   } else if (data.port === 3389) {
-    actionsHtml = `<button class="btn-action" onclick="window.electronAPI.openExternalAction({type:'rdp', ip:'${ip}'})"><span class="icon">🖥️</span> Remote Desktop</button>`;
+    const btn = document.createElement('button');
+    btn.className = 'btn-action';
+    btn.innerHTML = '<span class="icon">🖥️</span> Remote Desktop';
+    btn.addEventListener('click', () => window.electronAPI.openExternalAction({type:'rdp', ip}));
+    container.appendChild(btn);
   }
-  return actionsHtml ? `<div class="ds-actions">${actionsHtml}</div>` : '';
 }
 
 function openDetailsPanel(host) {
@@ -877,8 +902,7 @@ function openDetailsPanel(host) {
         const actionsContainer = document.createElement('div');
         actionsContainer.className = 'ds-actions';
         // Hydrate actions via innerHTML for complex buttons but since these are hardcoded patterns it's relatively safe
-        // though we could also refactor getActionButtonsHtml to return elements.
-        actionsContainer.innerHTML = getActionButtonsHtml(host.ip, data);
+        renderActionButtons(actionsContainer, host.ip, data);
         headerNode.appendChild(actionsContainer);
 
         const detailsDiv = document.createElement('div');
@@ -1237,7 +1261,17 @@ function attachDetailsPanelListeners(host) {
     let newBlock = document.createElement('div');
     newBlock.className = 'ds-record';
     newBlock.id = `nmap-live-${type}`;
-    newBlock.innerHTML = `<div class="ds-service">Live Nmap ${label}</div><div class="ds-banner" id="nmap-live-banner-${type}">Initializing...</div>`;
+    const labelDiv = document.createElement('div');
+    labelDiv.className = 'ds-service';
+    labelDiv.textContent = `Live Nmap ${label}`;
+    
+    const bannerDiv = document.createElement('div');
+    bannerDiv.className = 'ds-banner';
+    bannerDiv.id = `nmap-live-banner-${type}`;
+    bannerDiv.textContent = 'Initializing...';
+    
+    newBlock.appendChild(labelDiv);
+    newBlock.appendChild(bannerDiv);
     nmapScanResults.prepend(newBlock);
 
     await api.runNmapScan(type, type === 'port' ? `${host.ip}:${btn.getAttribute('data-port')}` : host.ip);
@@ -1312,7 +1346,17 @@ function attachDetailsPanelListeners(host) {
         let newBlock = document.createElement('div');
         newBlock.className = 'ds-record';
         newBlock.id = `nmap-live-custom`;
-        newBlock.innerHTML = `<div class="ds-service">Live NSE Execution (${selectedNseScript})</div><div class="ds-banner" id="nmap-live-banner-custom">Initializing...</div>`;
+    const labelDiv = document.createElement('div');
+    labelDiv.className = 'ds-service';
+    labelDiv.textContent = `Live NSE Execution (${selectedNseScript})`;
+    
+    const bannerDiv = document.createElement('div');
+    bannerDiv.className = 'ds-banner';
+    bannerDiv.id = 'nmap-live-banner-custom';
+    bannerDiv.textContent = 'Initializing...';
+    
+    newBlock.appendChild(labelDiv);
+    newBlock.appendChild(bannerDiv);
         nmapScanResults.prepend(newBlock);
 
         await api.runNmapScan('custom', {
@@ -1334,7 +1378,11 @@ function attachDetailsPanelListeners(host) {
           newBtn.id = btnId;
           newBtn.className = 'btn warning full-width';
           newBtn.setAttribute('data-port', port);
-          newBtn.innerHTML = `<span class="icon">🎯</span> Nmap specific port: ${port}`;
+          const iconSpan = document.createElement('span');
+          iconSpan.className = 'icon';
+          iconSpan.textContent = '🎯';
+          newBtn.appendChild(iconSpan);
+          newBtn.append(` Nmap specific port: ${port}`);
           newBtn.addEventListener('click', () => handleNmapScan(btnId, 'port', `Port ${port} Scan`));
           nmapActions.appendChild(newBtn);
        }
@@ -1825,39 +1873,58 @@ if (window.electronAPI) {
       record.style.background = 'rgba(235,94,94,0.05)';
     }
     
-    let bannerHtml = '';
-    if (data.rawBanner) {
-       // Escape basic HTML
-       const safeBanner = data.rawBanner.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-       bannerHtml = `<div class="ds-banner">${safeBanner}</div>`;
-    }
+    const headerNode = document.createElement('div');
+    headerNode.className = 'ds-header';
 
-    let actionTag = '';
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'ds-header-title';
+
+    const portSpan = document.createElement('span');
+    portSpan.className = 'ds-port';
+    portSpan.textContent = `PORT ${data.port}`;
+
+    const serviceSpan = document.createElement('span');
+    serviceSpan.className = 'ds-service';
+    serviceSpan.textContent = data.serviceName;
+
+    titleDiv.appendChild(portSpan);
+    titleDiv.appendChild(serviceSpan);
+
     if (data.vulnerable) {
-       const cl = data.severity === 'critical' ? 'danger' : 'warning';
-       actionTag = `<span style="font-size: 10px; color: var(--${cl}); border: 1px solid var(--${cl}); margin-left: 8px; padding: 2px 4px; border-radius: 2px;">${data.severity.toUpperCase()}</span>`;
+      const cl = data.severity === 'critical' ? 'danger' : 'warning';
+      const tag = document.createElement('span');
+      tag.style.cssText = `font-size: 10px; color: var(--${cl}); border: 1px solid var(--${cl}); margin-left: 8px; padding: 2px 4px; border-radius: 2px;`;
+      tag.textContent = data.severity.toUpperCase();
+      titleDiv.appendChild(tag);
     }
 
-    // Determine Action Buttons
-    let actionsHtml = '';
+    headerNode.appendChild(titleDiv);
+
+    const actionsContainer = document.createElement('div');
+    actionsContainer.className = 'ds-actions';
     const ip = document.getElementById('btn-run-deep-scan')?.getAttribute('data-ip');
-    
     if (ip) {
-      actionsHtml = getActionButtonsHtml(ip, data);
+      renderActionButtons(actionsContainer, ip, data);
     }
+    headerNode.appendChild(actionsContainer);
 
-    record.innerHTML = `
-      <div class="ds-header">
-        <div class="ds-header-title">
-          <span class="ds-port">PORT ${data.port}</span>
-          <span class="ds-service">${data.serviceName}</span>
-          ${actionTag}
-        </div>
-        ${actionsHtml}
-      </div>
-      <div class="ds-details" style="${data.vulnerable ? 'color: var(--danger); font-weight: 500;' : ''}">${data.details}</div>
-      ${bannerHtml}
-    `;
+    const detailsDiv = document.createElement('div');
+    detailsDiv.className = 'ds-details';
+    if (data.vulnerable) {
+      detailsDiv.style.color = 'var(--danger)';
+      detailsDiv.style.fontWeight = '500';
+    }
+    detailsDiv.textContent = data.details;
+
+    record.appendChild(headerNode);
+    record.appendChild(detailsDiv);
+
+    if (data.rawBanner) {
+      const bannerDiv = document.createElement('div');
+      bannerDiv.className = 'ds-banner';
+      bannerDiv.textContent = data.rawBanner;
+      record.appendChild(bannerDiv);
+    }
     
     dsResults.appendChild(record);
   });
@@ -1941,8 +2008,7 @@ if (window.electronAPI) {
     const bannerBlock = document.getElementById(`nmap-live-banner-${type}`);
     if (bannerBlock) {
       if (bannerBlock.innerText === 'Initializing...') bannerBlock.innerText = '';
-      const safeChunk = chunk.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      bannerBlock.innerHTML += safeChunk;
+      bannerBlock.textContent += chunk;
     }
   });
 

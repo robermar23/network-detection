@@ -16,7 +16,7 @@ export function cancelDeepScan(ip) {
 /**
  * Attempts a raw TCP connection to read the first packet (Banner Grabbing)
  */
-function grabBanner(ip, port) {
+export function grabBanner(ip, port) {
   return new Promise((resolve) => {
     let resolved = false;
 
@@ -57,7 +57,7 @@ function grabBanner(ip, port) {
 /**
  * Extracts TLS/SSL certificate information
  */
-function grabTlsCert(ip, port) {
+export function grabTlsCert(ip, port) {
   return new Promise((resolve) => {
     let resolved = false;
 
@@ -93,7 +93,7 @@ function grabTlsCert(ip, port) {
 /**
  * Analyzes banner/cert payloads to guess the underlying service.
  */
-function analyzeService(port, banner, tlsCert) {
+export function analyzeService(port, banner, tlsCert) {
   let serviceName = 'Unknown TCP Service';
   let details = '';
   let vulnerable = false;

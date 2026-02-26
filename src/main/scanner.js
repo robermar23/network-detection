@@ -205,7 +205,7 @@ async function scanPorts(ip) {
 /**
  * Advanced OS Fingerprinting combining Port Heuristics + Vendor OUI
  */
-function guessOS(ports, vendor) {
+export function guessOS(ports, vendor) {
   const p = new Set(ports);
 
   // 1. Definitives based on distinct port signatures

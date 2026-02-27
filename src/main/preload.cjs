@@ -45,7 +45,30 @@ var IPC_CHANNELS = {
   STOP_TSHARK: "stop-tshark",
   TSHARK_VLAN_FOUND: "tshark-vlan-found",
   TSHARK_ERROR: "tshark-error",
-  TSHARK_COMPLETE: "tshark-complete"
+  TSHARK_COMPLETE: "tshark-complete",
+  // Passive Network Intelligence
+  START_PASSIVE_CAPTURE: "start-passive-capture",
+  STOP_PASSIVE_CAPTURE: "stop-passive-capture",
+  STOP_ALL_PASSIVE: "stop-all-passive",
+  // Rogue DHCP Detection
+  PASSIVE_DHCP_ALERT: "passive-dhcp-alert",
+  PASSIVE_DHCP_ERROR: "passive-dhcp-error",
+  // Cleartext Credential Sniffing
+  PASSIVE_CRED_FOUND: "passive-cred-found",
+  PASSIVE_CRED_ERROR: "passive-cred-error",
+  // DNS Query Harvesting
+  PASSIVE_DNS_HOST: "passive-dns-host",
+  PASSIVE_DNS_ERROR: "passive-dns-error",
+  // Live PCAP Export
+  EXPORT_PCAP: "export-pcap",
+  PCAP_EXPORT_COMPLETE: "pcap-export-complete",
+  PCAP_EXPORT_ERROR: "pcap-export-error",
+  // ARP Spoofing Detection
+  PASSIVE_ARP_ALERT: "passive-arp-alert",
+  PASSIVE_ARP_ERROR: "passive-arp-error",
+  // Shared
+  PASSIVE_CAPTURE_COMPLETE: "passive-capture-complete",
+  PASSIVE_STATUS_UPDATE: "passive-status-update"
 };
 
 // src/main/preload.js
@@ -97,6 +120,26 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
   onNmapScanResult: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.NMAP_SCAN_RESULT, (_event, value) => callback(value)),
   onNmapScanComplete: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.NMAP_SCAN_COMPLETE, (_event, value) => callback(value)),
   onNmapScanError: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.NMAP_SCAN_ERROR, (_event, value) => callback(value)),
+  // Passive Network Intelligence
+  startPassiveCapture: (moduleId, interfaceId, options) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.START_PASSIVE_CAPTURE, { moduleId, interfaceId, options }),
+  stopPassiveCapture: (moduleId) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.STOP_PASSIVE_CAPTURE, moduleId),
+  stopAllPassive: () => import_electron.ipcRenderer.invoke(IPC_CHANNELS.STOP_ALL_PASSIVE),
+  exportPcap: (payload) => import_electron.ipcRenderer.invoke(IPC_CHANNELS.EXPORT_PCAP, payload),
+  // Passive Event Listeners
+  onPassiveDhcpAlert: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.PASSIVE_DHCP_ALERT, (_event, value) => callback(value)),
+  onPassiveCredFound: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.PASSIVE_CRED_FOUND, (_event, value) => callback(value)),
+  onPassiveDnsHost: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.PASSIVE_DNS_HOST, (_event, value) => callback(value)),
+  onPassiveArpAlert: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.PASSIVE_ARP_ALERT, (_event, value) => callback(value)),
+  onPcapExportComplete: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.PCAP_EXPORT_COMPLETE, (_event, value) => callback(value)),
+  onPassiveStatusUpdate: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.PASSIVE_STATUS_UPDATE, (_event, value) => callback(value)),
+  onPassiveError: (callback) => {
+    import_electron.ipcRenderer.on(IPC_CHANNELS.PASSIVE_DHCP_ERROR, (_event, value) => callback(value));
+    import_electron.ipcRenderer.on(IPC_CHANNELS.PASSIVE_CRED_ERROR, (_event, value) => callback(value));
+    import_electron.ipcRenderer.on(IPC_CHANNELS.PASSIVE_DNS_ERROR, (_event, value) => callback(value));
+    import_electron.ipcRenderer.on(IPC_CHANNELS.PASSIVE_ARP_ERROR, (_event, value) => callback(value));
+    import_electron.ipcRenderer.on(IPC_CHANNELS.PCAP_EXPORT_ERROR, (_event, value) => callback(value));
+  },
+  onPassiveCaptureComplete: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.PASSIVE_CAPTURE_COMPLETE, (_event, value) => callback(value)),
   // Cleanup listeners
   removeListeners: () => {
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.HOST_FOUND);
@@ -111,5 +154,17 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.TSHARK_VLAN_FOUND);
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.TSHARK_ERROR);
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.TSHARK_COMPLETE);
+    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_DHCP_ALERT);
+    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_CRED_FOUND);
+    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_DNS_HOST);
+    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_ARP_ALERT);
+    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_DHCP_ERROR);
+    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_CRED_ERROR);
+    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_DNS_ERROR);
+    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_ARP_ERROR);
+    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PCAP_EXPORT_COMPLETE);
+    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PCAP_EXPORT_ERROR);
+    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_CAPTURE_COMPLETE);
+    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_STATUS_UPDATE);
   }
 });

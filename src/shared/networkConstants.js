@@ -63,6 +63,22 @@ export const COMMON_PORTS = [
   21, 22, 23, 25, 53, 80, 110, 111, 135, 139, 143, 443, 445, 548, 993, 995, 1723, 3306, 3389, 5900, 8080
 ];
 
+// Ports monitored by passive intelligence modules
+export const PASSIVE_MONITORED_PORTS = {
+  FTP: 21,
+  TELNET: 23,
+  HTTP: 80,
+  POP3: 110,
+  IMAP: 143,
+  HTTP_ALT: 8080,
+};
+
+// Known DHCP options to identify rogue servers
+export const DHCP_MESSAGE_TYPES = {
+  OFFER: 2,
+  ACK: 5,
+};
+
 export const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
 
 /**

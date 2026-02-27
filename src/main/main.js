@@ -27,6 +27,12 @@ import { parseNmapXml } from './nmapXmlParser.js';
 import ping from 'ping';
 import { getSetting, setSetting, getAllSettings, checkDependency } from './store.js';
 import { startTsharkCapture, stopTsharkCapture } from './tsharkScanner.js';
+import { startDhcpDetection, stopDhcpDetection } from './rogueDhcpDetector.js';
+import { startCredentialSniffing, stopCredentialSniffing } from './credentialSniffer.js';
+import { startDnsHarvesting, stopDnsHarvesting } from './dnsHarvester.js';
+import { startArpDetection, stopArpDetection } from './arpSpoofDetector.js';
+import { exportPcap } from './pcapExporter.js';
+import { stopAll as stopAllPassive } from './passiveCapture.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -268,6 +274,85 @@ ipcMain.handle(IPC_CHANNELS.STOP_TSHARK, async () => {
   const stopped = stopTsharkCapture();
   return { status: stopped ? 'stopped' : 'not_running' };
 });
+
+// --- Passive Network Intelligence ---
+
+ipcMain.handle(IPC_CHANNELS.START_PASSIVE_CAPTURE, async (event, { moduleId, interfaceId, options }) => {
+  console.log(`Starting passive capture module: ${moduleId} on ${interfaceId}`);
+  
+  let success = false;
+  
+  const onError = (errorMsg) => {
+    const channelMap = {
+      'dhcp': IPC_CHANNELS.PASSIVE_DHCP_ERROR,
+      'creds': IPC_CHANNELS.PASSIVE_CRED_ERROR,
+      'dns': IPC_CHANNELS.PASSIVE_DNS_ERROR,
+      'arp': IPC_CHANNELS.PASSIVE_ARP_ERROR
+    };
+    if (mainWindow && channelMap[moduleId]) {
+      mainWindow.webContents.send(channelMap[moduleId], errorMsg);
+    }
+  };
+
+  const onComplete = (data) => {
+    if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.PASSIVE_CAPTURE_COMPLETE, data);
+  };
+
+  if (moduleId === 'dhcp') {
+    success = startDhcpDetection(interfaceId, 
+      (alert) => mainWindow?.webContents.send(IPC_CHANNELS.PASSIVE_DHCP_ALERT, alert),
+      onError, onComplete
+    );
+  } else if (moduleId === 'creds') {
+    success = startCredentialSniffing(interfaceId,
+      (cred) => mainWindow?.webContents.send(IPC_CHANNELS.PASSIVE_CRED_FOUND, cred),
+      onError, onComplete
+    );
+  } else if (moduleId === 'dns') {
+    success = startDnsHarvesting(interfaceId,
+      (host) => mainWindow?.webContents.send(IPC_CHANNELS.PASSIVE_DNS_HOST, host),
+      onError, onComplete
+    );
+  } else if (moduleId === 'arp') {
+    success = startArpDetection(interfaceId,
+      (alert) => mainWindow?.webContents.send(IPC_CHANNELS.PASSIVE_ARP_ALERT, alert),
+      onError, onComplete
+    );
+  }
+
+  return { status: success ? 'started' : 'failed' };
+});
+
+ipcMain.handle(IPC_CHANNELS.STOP_PASSIVE_CAPTURE, async (event, moduleId) => {
+  console.log(`Stopping passive capture module: ${moduleId}`);
+  let stopped = false;
+  if (moduleId === 'dhcp') stopped = stopDhcpDetection();
+  else if (moduleId === 'creds') stopped = stopCredentialSniffing();
+  else if (moduleId === 'dns') stopped = stopDnsHarvesting();
+  else if (moduleId === 'arp') stopped = stopArpDetection();
+  
+  return { status: stopped ? 'stopped' : 'not_running' };
+});
+
+ipcMain.handle(IPC_CHANNELS.STOP_ALL_PASSIVE, async () => {
+  console.log('Stopping all passive capture modules');
+  const stopped = stopAllPassive();
+  return { status: 'stopped', modules: stopped };
+});
+
+ipcMain.handle(IPC_CHANNELS.EXPORT_PCAP, async (event, { interfaceId, hostIp, duration }) => {
+  console.log('Starting PCAP export');
+  return await exportPcap(
+    mainWindow, 
+    interfaceId, 
+    hostIp, 
+    duration,
+    (data) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_EXPORT_COMPLETE, data),
+    (err) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_EXPORT_ERROR, err)
+  );
+});
+
+// --- Results Management ---
 
 ipcMain.handle(IPC_CHANNELS.SAVE_RESULTS, async (event, results) => {
   console.log('Save requested', results?.length || 0);

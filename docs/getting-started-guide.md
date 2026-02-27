@@ -144,7 +144,20 @@ NetSpecter natively integrates with Wireshark's CLI tool (`tshark`) to passively
 4. Click **Start Capture**. NetSpecter will transparently orchestrate a Wireshark capture filtered strictly to `vlan` packets.
 5. As tagged frames are intercepted traversing the wire, the UI will extract the `VLAN ID` and the source/destination MAC addresses, appending them securely to the streaming dashboard widget in real-time.
 
-## 9. Persisting Data (Saving and Loading)
+## 9. Passive Network Intelligence (Tshark)
+
+NetSpecter also features a powerful **Passive Intelligence** suite backed by Tshark. This allows you to silently monitor the network for configuration issues, security threats, and hidden hosts.
+
+1. Click the **🕵️ Passive Intelligence** button in the top toolbar to open the panel.
+2. Select your listening interface from the dropdown.
+3. Toggle any of the four available modules:
+   * **DHCP Rogue Detection**: Alerts you immediately if an unknown or spoofed DHCP server starts offering IP addresses on your subnet.
+   * **Credential Sniffer**: Silently extracts cleartext passwords from insecure protocols like FTP, Telnet, HTTP Basic Auth, POP3, and IMAP. *(Note: You must explicitly accept a legal disclaimer before activating this module).*
+   * **DNS Harvester**: Monitors DNS and mDNS queries passively. Any newly discovered hosts are seamlessly promoted to your main NetSpecter dashboard without sending a single active probe.
+   * **ARP Spoofing Detection**: Monitors ARP replies to instantly detect Man-in-the-Middle (MitM) ARP poisoning attacks and gratuitous ARP announcements.
+4. **PCAP Export**: Need raw packet data? Click the **📥 Export PCAP...** button to spawn a targeted packet capture saved directly to your hard drive, ready for Wireshark analysis.
+
+## 10. Persisting Data (Saving and Loading)
 
 Any Nmap Scans, NSE Explorations, and Native Port Banners queried in the current application state session are saved in the DOM.
 

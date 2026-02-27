@@ -52,5 +52,35 @@ export const IPC_CHANNELS = {
   STOP_TSHARK: 'stop-tshark',
   TSHARK_VLAN_FOUND: 'tshark-vlan-found',
   TSHARK_ERROR: 'tshark-error',
-  TSHARK_COMPLETE: 'tshark-complete'
+  TSHARK_COMPLETE: 'tshark-complete',
+
+  // Passive Network Intelligence
+  START_PASSIVE_CAPTURE: 'start-passive-capture',
+  STOP_PASSIVE_CAPTURE: 'stop-passive-capture',
+  STOP_ALL_PASSIVE: 'stop-all-passive',
+
+  // Rogue DHCP Detection
+  PASSIVE_DHCP_ALERT: 'passive-dhcp-alert',
+  PASSIVE_DHCP_ERROR: 'passive-dhcp-error',
+
+  // Cleartext Credential Sniffing
+  PASSIVE_CRED_FOUND: 'passive-cred-found',
+  PASSIVE_CRED_ERROR: 'passive-cred-error',
+
+  // DNS Query Harvesting
+  PASSIVE_DNS_HOST: 'passive-dns-host',
+  PASSIVE_DNS_ERROR: 'passive-dns-error',
+
+  // Live PCAP Export
+  EXPORT_PCAP: 'export-pcap',
+  PCAP_EXPORT_COMPLETE: 'pcap-export-complete',
+  PCAP_EXPORT_ERROR: 'pcap-export-error',
+
+  // ARP Spoofing Detection
+  PASSIVE_ARP_ALERT: 'passive-arp-alert',
+  PASSIVE_ARP_ERROR: 'passive-arp-error',
+
+  // Shared
+  PASSIVE_CAPTURE_COMPLETE: 'passive-capture-complete',
+  PASSIVE_STATUS_UPDATE: 'passive-status-update'
 };

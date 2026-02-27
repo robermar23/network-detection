@@ -2295,8 +2295,337 @@ if (window.electronAPI) {
     }
 
     // Scan-all queue: advance even on error
+    // Scan-all queue: advance even on error
     if (scanAll.state.isRunning && scanAll.state.type !== 'native' && scanAll.state.active.has(ip)) {
       scanAll.onHostDone(ip);
     }
   });
+
+  // --- PASSIVE NETWORK INTELLIGENCE ---
+  const passiveTabs = document.querySelectorAll('.modal-tab[data-passive-tab]');
+  const passiveTabPanes = document.querySelectorAll('.passive-tab-pane');
+  const ui = {};
+  ['dhcp', 'creds', 'dns', 'arp'].forEach(m => {
+    ui[m] = {
+      toggle: document.getElementById(`toggle-${m}`),
+      status: document.getElementById(`status-${m}`),
+      badge: document.getElementById(`badge-${m}`),
+      results: document.getElementById(`passive-results-${m}`)
+    };
+  });
+
+  const btnAcceptCreds = document.getElementById('btn-accept-creds');
+  const btnRejectCreds = document.getElementById('btn-reject-creds');
+  const credDisclaimerBanner = document.getElementById('cred-disclaimer-banner');
+  let isCredsAccepted = false;
+
+  const btnStopAllPassive = document.getElementById('btn-stop-all-passive');
+  const btnExportPcap = document.getElementById('btn-export-pcap');
+  const passiveErrorBanner = document.getElementById('passive-error-banner');
+  const passiveErrorText = document.getElementById('passive-error-text');
+  const btnClosePassiveError = document.getElementById('btn-close-passive-error');
+
+  btnClosePassiveError?.addEventListener('click', () => {
+    passiveErrorBanner.style.display = 'none';
+  });
+
+  passiveTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      passiveTabs.forEach(t => t.classList.remove('active'));
+      passiveTabPanes.forEach(p => p.style.display = 'none');
+      tab.classList.add('active');
+      document.getElementById(`tab-passive-${tab.dataset.passiveTab}`).style.display = 'block';
+    });
+  });
+
+  const passiveInterfaceSelect = document.getElementById('passive-interface-select');
+
+  ['dhcp', 'creds', 'dns', 'arp'].forEach(m => {
+    ui[m].toggle?.addEventListener('change', async (e) => {
+      const isChecked = e.target.checked;
+      const iface = passiveInterfaceSelect.value;
+      
+      if (isChecked) {
+        if (!iface) {
+          alert('Please select a network interface first.');
+          e.target.checked = false;
+          return;
+        }
+        
+        if (m === 'creds' && !isCredsAccepted) {
+          e.target.checked = false;
+          credDisclaimerBanner.style.display = 'block';
+          return;
+        }
+        
+        ui[m].status.textContent = 'Capturing';
+        ui[m].status.className = 'passive-status capturing';
+        if (m !== 'dns' && m !== 'creds') ui[m].results.innerHTML = '';
+        if (m === 'creds' || m === 'dns') ui[m].results.innerHTML = `<tr><td colspan="5" style="text-align:center; color: var(--text-muted); padding: 12px;">Waiting for data...</td></tr>`;
+        
+        ui[m].badge.textContent = '0';
+        state.passiveModules[m].running = true;
+        
+        const res = await api.startPassiveCapture(m, iface, {});
+        if (res.status !== 'started') {
+           ui[m].toggle.checked = false;
+           state.passiveModules[m].running = false;
+           ui[m].status.textContent = 'Idle';
+           ui[m].status.className = 'passive-status';
+           passiveErrorText.textContent = res.error || `Failed to start ${m} capture.`;
+           passiveErrorBanner.style.display = 'block';
+        }
+      } else {
+        await api.stopPassiveCapture(m);
+        state.passiveModules[m].running = false;
+        ui[m].status.textContent = 'Idle';
+        ui[m].status.className = 'passive-status';
+      }
+    });
+  });
+
+  btnAcceptCreds?.addEventListener('click', () => {
+    isCredsAccepted = true;
+    credDisclaimerBanner.style.display = 'none';
+    ui.creds.toggle.checked = true;
+    ui.creds.toggle.dispatchEvent(new Event('change'));
+  });
+
+  btnRejectCreds?.addEventListener('click', () => {
+    credDisclaimerBanner.style.display = 'none';
+    ui.creds.toggle.checked = false;
+  });
+
+  btnStopAllPassive?.addEventListener('click', async () => {
+    await api.stopAllPassive();
+    ['dhcp', 'creds', 'dns', 'arp'].forEach(m => {
+      ui[m].toggle.checked = false;
+      state.passiveModules[m].running = false;
+      ui[m].status.textContent = 'Idle';
+      ui[m].status.className = 'passive-status';
+    });
+  });
+
+  window.electronAPI.onPassiveDhcpAlert && window.electronAPI.onPassiveDhcpAlert((alert) => {
+    state.passiveModules.dhcp.alerts.push(alert);
+    ui.dhcp.badge.textContent = state.passiveModules.dhcp.alerts.length;
+    
+    if (state.passiveModules.dhcp.alerts.length === 1) ui.dhcp.results.innerHTML = ''; // Clear waiting text
+    
+    const el = document.createElement('div');
+    el.className = `passive-alert-card ${alert.isTrusted ? 'severity-info' : 'severity-critical'}`;
+    el.innerHTML = `
+      <div style="display:flex; justify-content:space-between;">
+        <strong>${alert.isTrusted ? 'Trusted DHCP Server' : 'Rogue DHCP Detected!'}</strong>
+        <span style="font-family:monospace;">${alert.serverIp}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; color:var(--text-muted); opacity:0.8;">
+        <span>MAC: ${alert.serverMac}</span>
+        <span>Router: ${alert.offeredRouter || 'N/A'}</span>
+      </div>
+    `;
+    ui.dhcp.results.prepend(el);
+  });
+
+  window.electronAPI.onPassiveCredFound && window.electronAPI.onPassiveCredFound((cred) => {
+    state.passiveModules.creds.findings.push(cred);
+    ui.creds.badge.textContent = state.passiveModules.creds.findings.length;
+    
+    if (state.passiveModules.creds.findings.length === 1) ui.creds.results.innerHTML = ''; // Clear waiting text
+    
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${cred.protocol}</td>
+      <td style="font-family:monospace;">${cred.srcIp}</td>
+      <td style="font-family:monospace;">${cred.dstIp}:${cred.port}</td>
+      <td class="selectable-text" style="font-weight:600;">${cred.username}</td>
+      <td class="selectable-text" style="color:var(--danger);">${cred.maskedPassword}</td>
+    `;
+    ui.creds.results.prepend(tr);
+  });
+
+  function autoPromoteDnsHost(host) {
+    const exists = state.hosts.some(h => 
+      h.ip === host.srcIp || (h.hostname && h.hostname.toLowerCase() === host.hostname.toLowerCase())
+    );
+    if (!exists && host.srcIp) {
+      const newHost = {
+        ip: host.srcIp,
+        mac: 'Unknown',
+        status: 'online',
+        hostname: host.hostname,
+        vendor: 'Unknown (Passive DNS)'
+      };
+      state.hosts.push(newHost);
+      debouncedRenderAllHosts();
+    }
+  }
+
+  window.electronAPI.onPassiveDnsHost && window.electronAPI.onPassiveDnsHost((host) => {
+    const key = host.hostname;
+    if (!state.passiveModules.dns.hosts.has(key)) {
+      state.passiveModules.dns.hosts.set(key, { ...host, count: 1 });
+      autoPromoteDnsHost(host);
+    } else {
+      const existing = state.passiveModules.dns.hosts.get(key);
+      existing.count++;
+      existing.timestamp = host.timestamp;
+      // Re-evaluate promotion if we missed it or IP changed
+      autoPromoteDnsHost(host);
+    }
+    
+    ui.dns.badge.textContent = state.passiveModules.dns.hosts.size;
+    ui.dns.results.innerHTML = '';
+    const sorted = Array.from(state.passiveModules.dns.hosts.values()).sort((a,b) => b.timestamp - a.timestamp);
+    sorted.forEach(h => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="selectable-text" style="color:var(--primary); font-weight:500;">${h.hostname}</td>
+        <td style="font-family:monospace;">${h.srcIp || (h.resolvedIps && h.resolvedIps.join(', ')) || 'N/A'}</td>
+        <td>${h.querySource} <span style="opacity:0.6;">(x${h.count})</span></td>
+      `;
+      ui.dns.results.appendChild(tr);
+    });
+  });
+
+  window.electronAPI.onPassiveArpAlert && window.electronAPI.onPassiveArpAlert((alert) => {
+    state.passiveModules.arp.alerts.push(alert);
+    ui.arp.badge.textContent = state.passiveModules.arp.alerts.length;
+    
+    if (state.passiveModules.arp.alerts.length === 1) ui.arp.results.innerHTML = ''; // Clear waiting text
+    
+    const el = document.createElement('div');
+    el.className = `passive-alert-card ${alert.severity === 'critical' ? 'severity-critical' : 'severity-warning'}`;
+    el.innerHTML = `
+      <div style="display:flex; justify-content:space-between;">
+        <strong>${alert.severity === 'critical' ? 'ARP Spoof Detected!' : 'Gratuitous ARP'}</strong>
+        <span style="font-family:monospace;">${alert.ip}</span>
+      </div>
+      <div style="color:var(--text-muted); opacity: 0.8; margin-top:2px;">
+        ${alert.severity === 'critical' ? `MAC changed from ${alert.previousMac} to <span style="color:white; font-weight:600;">${alert.currentMac}</span>` : `Announcing MAC: ${alert.currentMac}`}
+      </div>
+    `;
+    ui.arp.results.prepend(el);
+  });
+
+  window.electronAPI.onPassiveError && window.electronAPI.onPassiveError((err) => {
+    passiveErrorText.textContent = err;
+    passiveErrorBanner.style.display = 'block';
+  });
+
+  window.electronAPI.onPcapExportComplete && window.electronAPI.onPcapExportComplete((data) => {
+     alert(`PCAP Export Complete!\nSaved ${data.packetCount} packets to:\n${data.filePath}`);
+  });
+  
+  window.electronAPI.onPcapExportError && window.electronAPI.onPcapExportError((err) => {
+     alert(`PCAP Export Error:\n${err}`);
+  });
 }
+
+// --- Passive Panel Integration (Outside electronAPI block for dom events) ---
+const btnTogglePassivePanel = document.getElementById('btn-toggle-passive-panel');
+const passivePanel = document.getElementById('passive-panel');
+const btnClosePassivePanel = document.getElementById('btn-close-passive-panel');
+const btnRefreshPassiveInterfaces = document.getElementById('btn-refresh-passive-interfaces');
+const passiveInterfaceSelect = document.getElementById('passive-interface-select');
+
+async function refreshPassiveInterfaces() {
+  btnRefreshPassiveInterfaces.disabled = true;
+  passiveInterfaceSelect.innerHTML = '<option value="">Loading...</option>';
+  try {
+    const interfaces = await api.getInterfaces();
+    passiveInterfaceSelect.innerHTML = '<option value="">Select Interface...</option>';
+    interfaces.forEach(iface => {
+      const opt = document.createElement('option');
+      opt.value = iface.name; 
+      opt.textContent = `${iface.name} (${iface.ip})`;
+      passiveInterfaceSelect.appendChild(opt);
+    });
+  } catch (e) {
+    passiveInterfaceSelect.innerHTML = '<option value="">Error Loading</option>';
+  } finally {
+    btnRefreshPassiveInterfaces.disabled = false;
+  }
+}
+
+btnTogglePassivePanel?.addEventListener('click', async () => {
+  if (passivePanel.style.display === 'none' || !passivePanel.classList.contains('open')) {
+    if (elements.detailsPanel.classList.contains('open')) elements.detailsPanel.classList.remove('open');
+    if (vlanPanel && vlanPanel.classList.contains('open')) closePanel(vlanPanel, elements.sidebarResizer);
+    
+    openPanel(passivePanel, elements.sidebarResizer);
+    await refreshPassiveInterfaces();
+  } else {
+    closePanel(passivePanel, elements.sidebarResizer);
+  }
+});
+
+btnClosePassivePanel?.addEventListener('click', () => {
+  closePanel(passivePanel, elements.sidebarResizer);
+});
+
+btnRefreshPassiveInterfaces?.addEventListener('click', refreshPassiveInterfaces);
+
+// PCAP Modal Integration
+const pcapModalOverlay = document.getElementById('pcap-modal-overlay');
+const btnClosePcapModal = document.getElementById('btn-close-pcap-modal');
+const btnCancelPcap = document.getElementById('btn-cancel-pcap');
+const btnStartPcapBtn = document.getElementById('btn-start-pcap');
+const pcapInterfaceSelect = document.getElementById('pcap-interface');
+const pcapHostIpInput = document.getElementById('pcap-host-ip');
+const pcapDurationInput = document.getElementById('pcap-duration');
+const btnExportPcap = document.getElementById('btn-export-pcap');
+
+btnExportPcap?.addEventListener('click', async () => {
+  pcapModalOverlay.classList.remove('hidden');
+  pcapInterfaceSelect.innerHTML = '<option value="">Loading...</option>';
+  try {
+    const interfaces = await api.getInterfaces();
+    pcapInterfaceSelect.innerHTML = '';
+    interfaces.forEach(iface => {
+      const opt = document.createElement('option');
+      opt.value = iface.name; 
+      opt.textContent = `${iface.name} (${iface.ip})`;
+      pcapInterfaceSelect.appendChild(opt);
+    });
+    if (passiveInterfaceSelect.value) {
+      pcapInterfaceSelect.value = passiveInterfaceSelect.value;
+    }
+  } catch (e) {
+    pcapInterfaceSelect.innerHTML = '<option value="">Error Loading</option>';
+  }
+});
+
+const closePcapModal = () => pcapModalOverlay.classList.add('hidden');
+btnClosePcapModal?.addEventListener('click', closePcapModal);
+btnCancelPcap?.addEventListener('click', closePcapModal);
+
+btnStartPcapBtn?.addEventListener('click', async () => {
+  const iface = pcapInterfaceSelect.value;
+  if (!iface) {
+    alert('Select an interface');
+    return;
+  }
+  
+  const host = pcapHostIpInput.value.trim();
+  const dur = parseInt(pcapDurationInput.value, 10) || 60;
+  
+  btnStartPcapBtn.disabled = true;
+  btnStartPcapBtn.textContent = 'Starting...';
+  
+  const res = await api.exportPcap({ interfaceId: iface, hostIp: host, duration: dur });
+  if (res.success && res.status === 'started') {
+    btnStartPcapBtn.textContent = 'Exporting...';
+    closePcapModal();
+    btnStartPcapBtn.disabled = false;
+    btnStartPcapBtn.textContent = 'Start Export';
+  } else {
+    btnStartPcapBtn.disabled = false;
+    btnStartPcapBtn.textContent = 'Start Export';
+    if (res.status !== 'cancelled') {
+       alert(`Failed to start PCAP export: ${res.error}`);
+    } else {
+       closePcapModal();
+    }
+  }
+});

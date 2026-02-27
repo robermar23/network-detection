@@ -1390,36 +1390,33 @@ elements.btnCloseDetails.addEventListener('click', () => {
 });
 
 // Resizer logic
+let activeResize = null;
+
+document.addEventListener('mousemove', (e) => {
+  if (!activeResize) return;
+  const { panelEl, startX, startWidth } = activeResize;
+  const newWidth = startWidth - (e.clientX - startX);
+  if (newWidth > 300 && newWidth < Math.min(800, window.innerWidth - 100)) {
+    panelEl.style.width = `${newWidth}px`;
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  if (!activeResize) return;
+  activeResize.resizerEl.classList.remove('is-resizing');
+  document.body.style.cursor = '';
+  activeResize = null;
+});
+
 function initResizer(resizerEl, panelEl) {
   if (!resizerEl || !panelEl) return;
   
-  let isResizing = false;
-  let startX;
-  let startWidth;
-
   resizerEl.addEventListener('mousedown', (e) => {
-    isResizing = true;
-    startX = e.clientX;
-    startWidth = parseInt(document.defaultView.getComputedStyle(panelEl).width, 10);
+    const startWidth = parseInt(document.defaultView.getComputedStyle(panelEl).width, 10);
+    activeResize = { resizerEl, panelEl, startX: e.clientX, startWidth };
     resizerEl.classList.add('is-resizing');
     document.body.style.cursor = 'col-resize';
     e.preventDefault();
-  });
-
-  document.addEventListener('mousemove', (e) => {
-    if (!isResizing) return;
-    const newWidth = startWidth - (e.clientX - startX);
-    if (newWidth > 300 && newWidth < Math.min(800, window.innerWidth - 100)) {
-      panelEl.style.width = `${newWidth}px`;
-    }
-  });
-
-  document.addEventListener('mouseup', () => {
-    if (isResizing) {
-      isResizing = false;
-      resizerEl.classList.remove('is-resizing');
-      document.body.style.cursor = '';
-    }
   });
 }
 
@@ -2344,47 +2341,55 @@ if (window.electronAPI) {
 
   const passiveInterfaceSelect = document.getElementById('passive-interface-select');
 
-  ['dhcp', 'creds', 'dns', 'arp'].forEach(m => {
-    ui[m].toggle?.addEventListener('change', async (e) => {
-      const isChecked = e.target.checked;
-      const iface = passiveInterfaceSelect.value;
-      
-      if (isChecked) {
-        if (!iface) {
-          alert('Please select a network interface first.');
-          e.target.checked = false;
-          return;
-        }
-        
-        if (m === 'creds' && !isCredsAccepted) {
-          e.target.checked = false;
-          credDisclaimerBanner.style.display = 'block';
-          return;
-        }
-        
-        ui[m].status.textContent = 'Capturing';
-        ui[m].status.className = 'passive-status capturing';
-        if (m !== 'dns' && m !== 'creds') ui[m].results.innerHTML = '';
-        if (m === 'creds' || m === 'dns') ui[m].results.innerHTML = `<tr><td colspan="5" style="text-align:center; color: var(--text-muted); padding: 12px;">Waiting for data...</td></tr>`;
-        
-        ui[m].badge.textContent = '0';
-        state.passiveModules[m].running = true;
-        
-        const res = await api.startPassiveCapture(m, iface, {});
-        if (res.status !== 'started') {
-           ui[m].toggle.checked = false;
-           state.passiveModules[m].running = false;
-           ui[m].status.textContent = 'Idle';
-           ui[m].status.className = 'passive-status';
-           passiveErrorText.textContent = res.error || `Failed to start ${m} capture.`;
-           passiveErrorBanner.style.display = 'block';
-        }
-      } else {
-        await api.stopPassiveCapture(m);
-        state.passiveModules[m].running = false;
-        ui[m].status.textContent = 'Idle';
-        ui[m].status.className = 'passive-status';
+  const passiveModulesConfig = {
+    dhcp: { type: 'card', waitHtml: '' },
+    creds: { type: 'table', waitHtml: '<tr><td colspan="5" style="text-align:center; color: var(--text-muted); padding: 12px;">Waiting for data...</td></tr>', requiresConsent: true },
+    dns:  { type: 'table', waitHtml: '<tr><td colspan="3" style="text-align:center; color: var(--text-muted); padding: 12px;">Waiting for data...</td></tr>' },
+    arp:  { type: 'card', waitHtml: '' }
+  };
+
+  async function handlePassiveToggle(moduleKey, iface) {
+    const { requiresConsent, waitHtml } = passiveModulesConfig[moduleKey];
+    const moduleUi = ui[moduleKey];
+
+    if (moduleUi.toggle.checked) {
+      if (!iface) {
+        alert('Please select a network interface first.');
+        moduleUi.toggle.checked = false;
+        return;
       }
+      if (requiresConsent && !isCredsAccepted) {
+        moduleUi.toggle.checked = false;
+        credDisclaimerBanner.style.display = 'block';
+        return;
+      }
+
+      moduleUi.status.textContent = 'Capturing';
+      moduleUi.status.className = 'passive-status capturing';
+      moduleUi.results.innerHTML = waitHtml || '';
+      moduleUi.badge.textContent = '0';
+      state.passiveModules[moduleKey].running = true;
+
+      const res = await api.startPassiveCapture(moduleKey, iface, {});
+      if (res.status !== 'started') {
+        moduleUi.toggle.checked = false;
+        state.passiveModules[moduleKey].running = false;
+        moduleUi.status.textContent = 'Idle';
+        moduleUi.status.className = 'passive-status';
+        passiveErrorText.textContent = res.error || `Failed to start ${moduleKey} capture.`;
+        passiveErrorBanner.style.display = 'block';
+      }
+    } else {
+      await api.stopPassiveCapture(moduleKey);
+      state.passiveModules[moduleKey].running = false;
+      moduleUi.status.textContent = 'Idle';
+      moduleUi.status.className = 'passive-status';
+    }
+  }
+
+  ['dhcp', 'creds', 'dns', 'arp'].forEach(m => {
+    ui[m].toggle?.addEventListener('change', (e) => {
+      handlePassiveToggle(m, passiveInterfaceSelect.value);
     });
   });
 
@@ -2414,20 +2419,37 @@ if (window.electronAPI) {
     state.passiveModules.dhcp.alerts.push(alert);
     ui.dhcp.badge.textContent = state.passiveModules.dhcp.alerts.length;
     
-    if (state.passiveModules.dhcp.alerts.length === 1) ui.dhcp.results.innerHTML = ''; // Clear waiting text
+    if (state.passiveModules.dhcp.alerts.length === 1) ui.dhcp.results.innerHTML = '';
     
     const el = document.createElement('div');
     el.className = `passive-alert-card ${alert.isTrusted ? 'severity-info' : 'severity-critical'}`;
-    el.innerHTML = `
-      <div style="display:flex; justify-content:space-between;">
-        <strong>${alert.isTrusted ? 'Trusted DHCP Server' : 'Rogue DHCP Detected!'}</strong>
-        <span style="font-family:monospace;">${alert.serverIp}</span>
-      </div>
-      <div style="display:flex; justify-content:space-between; color:var(--text-muted); opacity:0.8;">
-        <span>MAC: ${alert.serverMac}</span>
-        <span>Router: ${alert.offeredRouter || 'N/A'}</span>
-      </div>
-    `;
+    
+    const topRow = document.createElement('div');
+    topRow.style.cssText = 'display:flex; justify-content:space-between;';
+    
+    const titleStr = document.createElement('strong');
+    titleStr.textContent = alert.isTrusted ? 'Trusted DHCP Server' : 'Rogue DHCP Detected!';
+    const ipSpan = document.createElement('span');
+    ipSpan.style.fontFamily = 'monospace';
+    ipSpan.textContent = alert.serverIp;
+    
+    topRow.appendChild(titleStr);
+    topRow.appendChild(ipSpan);
+    
+    const btmRow = document.createElement('div');
+    btmRow.style.cssText = 'display:flex; justify-content:space-between; color:var(--text-muted); opacity:0.8;';
+    
+    const macSpan = document.createElement('span');
+    macSpan.textContent = `MAC: ${alert.serverMac}`;
+    const routerSpan = document.createElement('span');
+    routerSpan.textContent = `Router: ${alert.offeredRouter || 'N/A'}`;
+    
+    btmRow.appendChild(macSpan);
+    btmRow.appendChild(routerSpan);
+    
+    el.appendChild(topRow);
+    el.appendChild(btmRow);
+    
     ui.dhcp.results.prepend(el);
   });
 
@@ -2435,16 +2457,37 @@ if (window.electronAPI) {
     state.passiveModules.creds.findings.push(cred);
     ui.creds.badge.textContent = state.passiveModules.creds.findings.length;
     
-    if (state.passiveModules.creds.findings.length === 1) ui.creds.results.innerHTML = ''; // Clear waiting text
+    if (state.passiveModules.creds.findings.length === 1) ui.creds.results.innerHTML = '';
     
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${cred.protocol}</td>
-      <td style="font-family:monospace;">${cred.srcIp}</td>
-      <td style="font-family:monospace;">${cred.dstIp}:${cred.port}</td>
-      <td class="selectable-text" style="font-weight:600;">${cred.username}</td>
-      <td class="selectable-text" style="color:var(--danger);">${cred.maskedPassword}</td>
-    `;
+    
+    const tdProto = document.createElement('td');
+    tdProto.textContent = cred.protocol;
+    
+    const tdSrc = document.createElement('td');
+    tdSrc.style.fontFamily = 'monospace';
+    tdSrc.textContent = cred.srcIp;
+    
+    const tdDst = document.createElement('td');
+    tdDst.style.fontFamily = 'monospace';
+    tdDst.textContent = `${cred.dstIp}:${cred.port}`;
+    
+    const tdUser = document.createElement('td');
+    tdUser.className = 'selectable-text';
+    tdUser.style.fontWeight = '600';
+    tdUser.textContent = cred.username;
+    
+    const tdPass = document.createElement('td');
+    tdPass.className = 'selectable-text';
+    tdPass.style.color = 'var(--danger)';
+    tdPass.textContent = cred.maskedPassword;
+    
+    tr.appendChild(tdProto);
+    tr.appendChild(tdSrc);
+    tr.appendChild(tdDst);
+    tr.appendChild(tdUser);
+    tr.appendChild(tdPass);
+    
     ui.creds.results.prepend(tr);
   });
 
@@ -2483,11 +2526,27 @@ if (window.electronAPI) {
     const sorted = Array.from(state.passiveModules.dns.hosts.values()).sort((a,b) => b.timestamp - a.timestamp);
     sorted.forEach(h => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="selectable-text" style="color:var(--primary); font-weight:500;">${h.hostname}</td>
-        <td style="font-family:monospace;">${h.srcIp || (h.resolvedIps && h.resolvedIps.join(', ')) || 'N/A'}</td>
-        <td>${h.querySource} <span style="opacity:0.6;">(x${h.count})</span></td>
-      `;
+      
+      const tdHost = document.createElement('td');
+      tdHost.className = 'selectable-text';
+      tdHost.style.cssText = 'color:var(--primary); font-weight:500;';
+      tdHost.textContent = h.hostname;
+      
+      const tdIp = document.createElement('td');
+      tdIp.style.fontFamily = 'monospace';
+      tdIp.textContent = h.srcIp || (h.resolvedIps && h.resolvedIps.join(', ')) || 'N/A';
+      
+      const tdType = document.createElement('td');
+      tdType.textContent = `${h.querySource} `;
+      const spanCount = document.createElement('span');
+      spanCount.style.opacity = '0.6';
+      spanCount.textContent = `(x${h.count})`;
+      tdType.appendChild(spanCount);
+      
+      tr.appendChild(tdHost);
+      tr.appendChild(tdIp);
+      tr.appendChild(tdType);
+      
       ui.dns.results.appendChild(tr);
     });
   });
@@ -2496,19 +2555,39 @@ if (window.electronAPI) {
     state.passiveModules.arp.alerts.push(alert);
     ui.arp.badge.textContent = state.passiveModules.arp.alerts.length;
     
-    if (state.passiveModules.arp.alerts.length === 1) ui.arp.results.innerHTML = ''; // Clear waiting text
+    if (state.passiveModules.arp.alerts.length === 1) ui.arp.results.innerHTML = '';
     
     const el = document.createElement('div');
     el.className = `passive-alert-card ${alert.severity === 'critical' ? 'severity-critical' : 'severity-warning'}`;
-    el.innerHTML = `
-      <div style="display:flex; justify-content:space-between;">
-        <strong>${alert.severity === 'critical' ? 'ARP Spoof Detected!' : 'Gratuitous ARP'}</strong>
-        <span style="font-family:monospace;">${alert.ip}</span>
-      </div>
-      <div style="color:var(--text-muted); opacity: 0.8; margin-top:2px;">
-        ${alert.severity === 'critical' ? `MAC changed from ${alert.previousMac} to <span style="color:white; font-weight:600;">${alert.currentMac}</span>` : `Announcing MAC: ${alert.currentMac}`}
-      </div>
-    `;
+    
+    const topRow = document.createElement('div');
+    topRow.style.cssText = 'display:flex; justify-content:space-between;';
+    
+    const titleStr = document.createElement('strong');
+    titleStr.textContent = alert.severity === 'critical' ? 'ARP Spoof Detected!' : 'Gratuitous ARP';
+    const ipSpan = document.createElement('span');
+    ipSpan.style.fontFamily = 'monospace';
+    ipSpan.textContent = alert.ip;
+    
+    topRow.appendChild(titleStr);
+    topRow.appendChild(ipSpan);
+    
+    const btmRow = document.createElement('div');
+    btmRow.style.cssText = 'color:var(--text-muted); opacity: 0.8; margin-top:2px;';
+    
+    if (alert.severity === 'critical') {
+      btmRow.textContent = `MAC changed from ${alert.previousMac} to `;
+      const newMacSpan = document.createElement('span');
+      newMacSpan.style.cssText = 'color:white; font-weight:600;';
+      newMacSpan.textContent = alert.currentMac;
+      btmRow.appendChild(newMacSpan);
+    } else {
+      btmRow.textContent = `Announcing MAC: ${alert.currentMac}`;
+    }
+    
+    el.appendChild(topRow);
+    el.appendChild(btmRow);
+    
     ui.arp.results.prepend(el);
   });
 
@@ -2527,108 +2606,114 @@ if (window.electronAPI) {
 }
 
 // --- Passive Panel Integration (Outside electronAPI block for dom events) ---
-const btnTogglePassivePanel = document.getElementById('btn-toggle-passive-panel');
-const passivePanel = document.getElementById('passive-panel');
-const btnClosePassivePanel = document.getElementById('btn-close-passive-panel');
-const btnRefreshPassiveInterfaces = document.getElementById('btn-refresh-passive-interfaces');
-const passiveInterfaceSelect = document.getElementById('passive-interface-select');
+function initPassivePanel() {
+  const btnTogglePassivePanel = document.getElementById('btn-toggle-passive-panel');
+  const passivePanel = document.getElementById('passive-panel');
+  const btnClosePassivePanel = document.getElementById('btn-close-passive-panel');
+  const btnRefreshPassiveInterfaces = document.getElementById('btn-refresh-passive-interfaces');
 
-async function refreshPassiveInterfaces() {
-  btnRefreshPassiveInterfaces.disabled = true;
-  passiveInterfaceSelect.innerHTML = '<option value="">Loading...</option>';
-  try {
-    const interfaces = await api.getInterfaces();
-    passiveInterfaceSelect.innerHTML = '<option value="">Select Interface...</option>';
-    interfaces.forEach(iface => {
-      const opt = document.createElement('option');
-      opt.value = iface.name; 
-      opt.textContent = `${iface.name} (${iface.ip})`;
-      passiveInterfaceSelect.appendChild(opt);
-    });
-  } catch (e) {
-    passiveInterfaceSelect.innerHTML = '<option value="">Error Loading</option>';
-  } finally {
-    btnRefreshPassiveInterfaces.disabled = false;
+  async function refreshPassiveInterfaces() {
+    btnRefreshPassiveInterfaces.disabled = true;
+    passiveInterfaceSelect.innerHTML = '<option value="">Loading...</option>';
+    try {
+      const interfaces = await api.getInterfaces();
+      passiveInterfaceSelect.innerHTML = '<option value="">Select Interface...</option>';
+      interfaces.forEach(iface => {
+        const opt = document.createElement('option');
+        opt.value = iface.name; 
+        opt.textContent = `${iface.name} (${iface.ip})`;
+        passiveInterfaceSelect.appendChild(opt);
+      });
+    } catch (e) {
+      console.error(e);
+      passiveInterfaceSelect.innerHTML = '<option value="">Error Loading</option>';
+    } finally {
+      btnRefreshPassiveInterfaces.disabled = false;
+    }
   }
-}
 
-btnTogglePassivePanel?.addEventListener('click', async () => {
-  if (passivePanel.style.display === 'none' || !passivePanel.classList.contains('open')) {
-    const resizer = document.getElementById('passive-resizer');
-    openPanel(passivePanel, resizer);
-    await refreshPassiveInterfaces();
-  } else {
+  btnTogglePassivePanel?.addEventListener('click', async () => {
+    if (passivePanel.style.display === 'none' || !passivePanel.classList.contains('open')) {
+      const resizer = document.getElementById('passive-resizer');
+      openPanel(passivePanel, resizer);
+      await refreshPassiveInterfaces();
+    } else {
+      const resizer = document.getElementById('passive-resizer');
+      closePanel(passivePanel, resizer);
+    }
+  });
+
+  btnClosePassivePanel?.addEventListener('click', () => {
     const resizer = document.getElementById('passive-resizer');
     closePanel(passivePanel, resizer);
-  }
-});
+  });
 
-btnClosePassivePanel?.addEventListener('click', () => {
-  closePanel(passivePanel, elements.sidebarResizer);
-});
+  btnRefreshPassiveInterfaces?.addEventListener('click', refreshPassiveInterfaces);
 
-btnRefreshPassiveInterfaces?.addEventListener('click', refreshPassiveInterfaces);
+  // PCAP Modal Integration
+  const pcapModalOverlay = document.getElementById('pcap-modal-overlay');
+  const btnClosePcapModal = document.getElementById('btn-close-pcap-modal');
+  const btnCancelPcap = document.getElementById('btn-cancel-pcap');
+  const btnStartPcapBtn = document.getElementById('btn-start-pcap');
+  const pcapInterfaceSelect = document.getElementById('pcap-interface');
+  const pcapHostIpInput = document.getElementById('pcap-host-ip');
+  const pcapDurationInput = document.getElementById('pcap-duration');
+  const btnExportPcap = document.getElementById('btn-export-pcap');
 
-// PCAP Modal Integration
-const pcapModalOverlay = document.getElementById('pcap-modal-overlay');
-const btnClosePcapModal = document.getElementById('btn-close-pcap-modal');
-const btnCancelPcap = document.getElementById('btn-cancel-pcap');
-const btnStartPcapBtn = document.getElementById('btn-start-pcap');
-const pcapInterfaceSelect = document.getElementById('pcap-interface');
-const pcapHostIpInput = document.getElementById('pcap-host-ip');
-const pcapDurationInput = document.getElementById('pcap-duration');
-const btnExportPcap = document.getElementById('btn-export-pcap');
-
-btnExportPcap?.addEventListener('click', async () => {
-  pcapModalOverlay.classList.remove('hidden');
-  pcapInterfaceSelect.innerHTML = '<option value="">Loading...</option>';
-  try {
-    const interfaces = await api.getInterfaces();
-    pcapInterfaceSelect.innerHTML = '';
-    interfaces.forEach(iface => {
-      const opt = document.createElement('option');
-      opt.value = iface.name; 
-      opt.textContent = `${iface.name} (${iface.ip})`;
-      pcapInterfaceSelect.appendChild(opt);
-    });
-    if (passiveInterfaceSelect.value) {
-      pcapInterfaceSelect.value = passiveInterfaceSelect.value;
+  btnExportPcap?.addEventListener('click', async () => {
+    pcapModalOverlay.classList.remove('hidden');
+    pcapInterfaceSelect.innerHTML = '<option value="">Loading...</option>';
+    try {
+      const interfaces = await api.getInterfaces();
+      pcapInterfaceSelect.innerHTML = '';
+      interfaces.forEach(iface => {
+        const opt = document.createElement('option');
+        opt.value = iface.name; 
+        opt.textContent = `${iface.name} (${iface.ip})`;
+        pcapInterfaceSelect.appendChild(opt);
+      });
+      if (passiveInterfaceSelect.value) {
+        pcapInterfaceSelect.value = passiveInterfaceSelect.value;
+      }
+    } catch (e) {
+      console.error(e);
+      pcapInterfaceSelect.innerHTML = '<option value="">Error Loading</option>';
     }
-  } catch (e) {
-    pcapInterfaceSelect.innerHTML = '<option value="">Error Loading</option>';
-  }
-});
+  });
 
-const closePcapModal = () => pcapModalOverlay.classList.add('hidden');
-btnClosePcapModal?.addEventListener('click', closePcapModal);
-btnCancelPcap?.addEventListener('click', closePcapModal);
+  const closePcapModal = () => pcapModalOverlay.classList.add('hidden');
+  btnClosePcapModal?.addEventListener('click', closePcapModal);
+  btnCancelPcap?.addEventListener('click', closePcapModal);
 
-btnStartPcapBtn?.addEventListener('click', async () => {
-  const iface = pcapInterfaceSelect.value;
-  if (!iface) {
-    alert('Select an interface');
-    return;
-  }
-  
-  const host = pcapHostIpInput.value.trim();
-  const dur = parseInt(pcapDurationInput.value, 10) || 60;
-  
-  btnStartPcapBtn.disabled = true;
-  btnStartPcapBtn.textContent = 'Starting...';
-  
-  const res = await api.exportPcap({ interfaceId: iface, hostIp: host, duration: dur });
-  if (res.success && res.status === 'started') {
-    btnStartPcapBtn.textContent = 'Exporting...';
-    closePcapModal();
-    btnStartPcapBtn.disabled = false;
-    btnStartPcapBtn.textContent = 'Start Export';
-  } else {
-    btnStartPcapBtn.disabled = false;
-    btnStartPcapBtn.textContent = 'Start Export';
-    if (res.status !== 'cancelled') {
-       alert(`Failed to start PCAP export: ${res.error}`);
+  btnStartPcapBtn?.addEventListener('click', async () => {
+    const iface = pcapInterfaceSelect.value;
+    if (!iface) {
+      alert('Select an interface');
+      return;
+    }
+    
+    const host = pcapHostIpInput.value.trim();
+    const dur = parseInt(pcapDurationInput.value, 10) || 60;
+    
+    btnStartPcapBtn.disabled = true;
+    btnStartPcapBtn.textContent = 'Starting...';
+    
+    const res = await api.exportPcap({ interfaceId: iface, hostIp: host, duration: dur });
+    if (res.success && res.status === 'started') {
+      btnStartPcapBtn.textContent = 'Exporting...';
+      closePcapModal();
+      btnStartPcapBtn.disabled = false;
+      btnStartPcapBtn.textContent = 'Start Export';
     } else {
-       closePcapModal();
+      btnStartPcapBtn.disabled = false;
+      btnStartPcapBtn.textContent = 'Start Export';
+      if (res.status !== 'cancelled') {
+         alert(`Failed to start PCAP export: ${res.error}`);
+      } else {
+         closePcapModal();
+      }
     }
-  }
-});
+  });
+}
+
+initPassivePanel();

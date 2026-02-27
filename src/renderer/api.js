@@ -36,5 +36,41 @@ export const api = {
   startPassiveCapture: async (moduleId, interfaceId, options) => window.electronAPI.startPassiveCapture(moduleId, interfaceId, options),
   stopPassiveCapture: async (moduleId) => window.electronAPI.stopPassiveCapture(moduleId),
   stopAllPassive: async () => window.electronAPI.stopAllPassive(),
-  exportPcap: async (payload) => window.electronAPI.exportPcap(payload)
+  exportPcap: async (payload) => window.electronAPI.exportPcap(payload),
+
+  // Engine Status
+  checkRustEngine: async () => window.electronAPI.checkRustEngine(),
+  checkReportsEngine: async () => window.electronAPI.checkReportsEngine(),
+
+  // Scan Profiles (Rust Engine)
+  profiles: {
+    list: async () => window.electronAPI.profiles.list(),
+    get: async (name) => window.electronAPI.profiles.get(name),
+    create: async (profile) => window.electronAPI.profiles.create(profile),
+    update: async (name, profile) => window.electronAPI.profiles.update(name, profile),
+    delete: async (name) => window.electronAPI.profiles.delete(name),
+    validate: async (profile) => window.electronAPI.profiles.validate(profile),
+  },
+
+  // Baseline & Diff (Rust Engine)
+  baseline: {
+    snapshot: async (hosts, label) => window.electronAPI.baseline.snapshot(hosts, label),
+    list: async () => window.electronAPI.baseline.list(),
+    get: async (id) => window.electronAPI.baseline.get(id),
+    delete: async (id) => window.electronAPI.baseline.delete(id),
+    diff: async (baselineId, currentHosts) => window.electronAPI.baseline.diff(baselineId, currentHosts),
+  },
+
+  // Service Fingerprinting (Rust Engine)
+  fingerprint: {
+    analyze: async (host, ports) => window.electronAPI.fingerprint.analyze(host, ports),
+  },
+
+  // Topology Builder (Rust Engine)
+  topology: {
+    build: async (hosts, fingerprints) => window.electronAPI.topology.build(hosts, fingerprints),
+  },
+
+  // Report Export (Go Engine)
+  exportReport: async (opts) => window.electronAPI.exportReport(opts)
 };

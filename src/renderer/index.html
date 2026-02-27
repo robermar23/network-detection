@@ -55,6 +55,16 @@
           <button id="btn-load" class="btn secondary">Load</button>
           <button id="btn-clear" class="btn secondary">Clear</button>
           <div class="divider"></div>
+          <button id="btn-profiles" class="btn secondary rust-engine-only" title="Scan Profiles" style="display: none;">
+            Profiles
+          </button>
+          <button id="btn-export-report" class="btn secondary reports-engine-only" title="Export Report" style="display: none;">
+            Export
+          </button>
+          <button id="btn-set-baseline" class="btn secondary rust-engine-only" title="Snapshot current hosts as baseline" style="display: none;">
+            Set Baseline
+          </button>
+          <div class="divider"></div>
           <button id="btn-settings" class="btn secondary" title="Settings">
             <span class="icon">⚙️</span> Settings
           </button>
@@ -128,6 +138,8 @@
               style="padding: 4px 8px; border-radius: 4px; box-shadow: none;">☰</button>
             <button id="btn-view-table" class="btn icon-only" title="Table View"
               style="padding: 4px 8px; border-radius: 4px; box-shadow: none;">🗄️</button>
+            <button id="btn-view-topology" class="btn icon-only rust-engine-only" title="Topology View"
+              style="padding: 4px 8px; border-radius: 4px; box-shadow: none; display: none;">Topo</button>
           </div>
         </div>
       </div>
@@ -159,6 +171,18 @@
           </div>
           -->
 
+        </div>
+
+        <!-- Topology View Container -->
+        <div id="topology-container" class="topology-container rust-engine-only" style="display: none;">
+          <canvas id="topology-canvas" width="1200" height="800"></canvas>
+          <div id="topology-legend" class="topology-legend">
+            <span class="legend-item"><span class="legend-dot" style="background: #74b9ff;"></span> Router</span>
+            <span class="legend-item"><span class="legend-dot" style="background: var(--success);"></span> Server</span>
+            <span class="legend-item"><span class="legend-dot" style="background: #b2bec3;"></span> Workstation</span>
+            <span class="legend-item"><span class="legend-dot" style="background: var(--warning);"></span> IoT</span>
+            <span class="legend-item"><span class="legend-dot" style="background: var(--text-muted);"></span> Unknown</span>
+          </div>
         </div>
 
         <!-- Empty State UI -->
@@ -567,6 +591,28 @@
           </div>
         </div>
 
+        <!-- Rust Engine Status Group -->
+        <div class="settings-group rust-engine-only" style="display: none;">
+          <div class="settings-group-header">
+            <h3><span class="icon">⚙️</span> Rust Analysis Engine</h3>
+          </div>
+          <p class="settings-description">Provides scan profiles, baseline diffing, service fingerprinting, and topology mapping.</p>
+          <div class="dependency-status" id="status-rust-engine">
+            <span class="status-dot"></span> <span class="status-text">Checking availability...</span>
+          </div>
+        </div>
+
+        <!-- Reports Engine Status Group -->
+        <div class="settings-group reports-engine-only" style="display: none;">
+          <div class="settings-group-header">
+            <h3><span class="icon">📊</span> Reports Engine</h3>
+          </div>
+          <p class="settings-description">Enables multi-format report export (JSON, CSV, HTML, PDF) with data sanitization.</p>
+          <div class="dependency-status" id="status-reports-engine">
+            <span class="status-dot"></span> <span class="status-text">Checking availability...</span>
+          </div>
+        </div>
+
       </div>
       <div class="modal-footer">
         <button id="btn-settings-done" class="btn primary">Save & Close</button>
@@ -598,6 +644,126 @@
       <div class="modal-footer">
         <button id="btn-cancel-pcap" class="btn secondary">Cancel</button>
         <button id="btn-start-pcap" class="btn primary">Start Export</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Profile Selector Modal -->
+  <div id="profile-modal-overlay" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header">
+        <h2>Scan Profiles</h2>
+        <button id="btn-close-profile-modal" class="btn icon-only modal-close">✕</button>
+      </div>
+      <div class="modal-tabs">
+        <button class="modal-tab active" data-profile-tab="select">Select Profile</button>
+        <button class="modal-tab" data-profile-tab="create">Create New</button>
+      </div>
+      <div class="modal-body">
+        <!-- Tab: Select Profile -->
+        <div class="tab-pane active" id="tab-profile-select">
+          <div id="profile-list" class="profile-list">
+            <div style="text-align:center; color: var(--text-muted); padding: 20px;">Loading profiles...</div>
+          </div>
+        </div>
+
+        <!-- Tab: Create New Profile -->
+        <div class="tab-pane" id="tab-profile-create">
+          <div class="form-group">
+            <label class="form-label">Profile Name *</label>
+            <input type="text" id="profile-name" class="text-input full-width" placeholder="e.g. quick-scan">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Port Range *</label>
+            <input type="text" id="profile-port-range" class="text-input full-width" placeholder="e.g. 1-1024 or 21,22,80,443">
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label">Timeout (ms)</label>
+              <input type="number" id="profile-timeout" class="text-input full-width" value="2000" min="100" max="60000">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Chunk Size</label>
+              <input type="number" id="profile-chunk-size" class="text-input full-width" value="100" min="1" max="500">
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="profile-banner-grab" checked> Banner Grab
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="profile-tls-inspect"> TLS Inspect
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="profile-security-audit"> Security Audit
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="profile-safe-mode" checked> Safe Mode
+            </label>
+          </div>
+          <div class="form-group" style="margin-top: 12px;">
+            <label class="form-label">Description</label>
+            <input type="text" id="profile-description" class="text-input full-width" placeholder="Optional description">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <span id="profile-status-text" class="pending-count"></span>
+        <div style="display:flex; gap:8px;">
+          <button id="btn-profile-cancel" class="btn secondary">Cancel</button>
+          <button id="btn-profile-save" class="btn primary" style="display: none;">Save Profile</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export Report Modal -->
+  <div id="export-modal-overlay" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width: 420px;">
+      <div class="modal-header">
+        <h2>Export Report</h2>
+        <button id="btn-close-export-modal" class="btn icon-only modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="tab-description">Select export formats and options for the current host data.</p>
+        <div class="form-group">
+          <label class="form-label">Formats</label>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="export-json" checked> JSON
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="export-csv"> CSV
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="export-html"> HTML
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="export-pdf"> PDF
+            </label>
+          </div>
+        </div>
+        <div style="border-top: 1px solid var(--border-glass); margin: 16px 0; padding-top: 16px;">
+          <div class="form-group">
+            <label class="form-label">Options</label>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+                <input type="checkbox" id="export-sanitize"> Sanitize sensitive data (MACs, IPs, hostnames)
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+                <input type="checkbox" id="export-summary" checked> Include management summary
+              </label>
+            </div>
+          </div>
+        </div>
+        <div id="export-status" class="import-status" style="display: none;"></div>
+      </div>
+      <div class="modal-footer">
+        <span id="export-count" class="pending-count">0 formats selected</span>
+        <div style="display:flex; gap:8px;">
+          <button id="btn-export-cancel" class="btn secondary">Cancel</button>
+          <button id="btn-export-start" class="btn primary">Export</button>
+        </div>
       </div>
     </div>
   </div>

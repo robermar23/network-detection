@@ -82,5 +82,34 @@ export const IPC_CHANNELS = {
 
   // Shared
   PASSIVE_CAPTURE_COMPLETE: 'passive-capture-complete',
-  PASSIVE_STATUS_UPDATE: 'passive-status-update'
+  PASSIVE_STATUS_UPDATE: 'passive-status-update',
+
+  // Scan Profiles (Rust Engine)
+  PROFILE_LIST: 'profile-list',
+  PROFILE_GET: 'profile-get',
+  PROFILE_CREATE: 'profile-create',
+  PROFILE_UPDATE: 'profile-update',
+  PROFILE_DELETE: 'profile-delete',
+  PROFILE_VALIDATE: 'profile-validate',
+
+  // Baseline & Diff (Rust Engine)
+  BASELINE_SNAPSHOT: 'baseline-snapshot',
+  BASELINE_LIST: 'baseline-list',
+  BASELINE_GET: 'baseline-get',
+  BASELINE_DELETE: 'baseline-delete',
+  BASELINE_DIFF: 'baseline-diff',
+
+  // Service Fingerprinting (Rust Engine)
+  FINGERPRINT_ANALYZE: 'fingerprint-analyze',
+
+  // Topology Builder (Rust Engine)
+  TOPOLOGY_BUILD: 'topology-build',
+
+  // Engine Status
+  RUST_ENGINE_STATUS: 'rust-engine-status',
+  REPORTS_ENGINE_STATUS: 'reports-engine-status',
+
+  // Report Export (Go Engine)
+  EXPORT_REPORT: 'export-report',
+  EXPORT_REPORT_COMPLETE: 'export-report-complete'
 };

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.1](https://github.com/robermar23/netspectre/compare/v1.8.0...v1.8.1) (2026-02-27)
+
+
+### Bug Fixes
+
+* **ui:** dynamic dependency banner missing tshark ipc handler ([b64f7ed](https://github.com/robermar23/netspectre/commit/b64f7edcc3a69f0a8a53f51cdb8bded237b9481f))
+
 ## [1.8.0](https://github.com/robermar23/netspectre/compare/v1.7.1...v1.8.0) (2026-02-27)
 
 

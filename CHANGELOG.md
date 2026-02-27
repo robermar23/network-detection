@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.8.0](https://github.com/robermar23/netspectre/compare/v1.7.1...v1.8.0) (2026-02-27)
+
+
+### Features
+
+* **scanner:** implement passive network intelligence suite ([45dc118](https://github.com/robermar23/netspectre/commit/45dc118c87354c265228b0705021094b67efcdc6))
+
+
+### Bug Fixes
+
+* **ui:** resolve manual testing bugs for passive intelligence ([324ffae](https://github.com/robermar23/netspectre/commit/324ffae602ec5784b743536306f1ea83f9aac869))
+
 ## [1.7.1](https://github.com/robermar23/netspectre/compare/v1.7.0...v1.7.1) (2026-02-26)
 
 

@@ -21,12 +21,10 @@
 
   <div class="app-container">
 
-    <!-- Nmap Install Banner (Hidden by default) -->
+    <!-- Install Dependency Banner (Hidden by default) -->
     <div id="nmap-install-banner" class="nmap-banner"
       style="display: none; position: relative; background: rgba(235, 177, 52, 0.9); color: #111; padding: 12px 20px; font-weight: 500; font-size: 14px; text-align: center; border-bottom: 1px solid #c99318;">
-      ⚠️ Nmap is not installed or not in your system PATH.
-      <a href="https://nmap.org/download.html" target="_blank"
-        style="color: #000; text-decoration: underline; font-weight: 600; margin-left: 10px;">Download Nmap Here</a>
+      ⚠️ <span class="banner-text"></span>
       <span style="margin-left: 10px; opacity: 0.8; font-size: 12px;">(Restart NetSpecter after installing)</span>
       <button id="btn-close-nmap-banner" class="btn icon-only"
         style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #000; background: rgba(0,0,0,0.1); padding: 4px;"

@@ -16,11 +16,29 @@ function escapeHtml(unsafe) {
 }
 
 // --- Initialization ---
-api.checkNmap().then(async (installed) => {
-  state.isNmapInstalled = installed;
-  if (!installed) {
-    elements.nmapInstallBanner.style.display = 'block';
+Promise.all([api.checkNmap(), api.checkTshark()]).then(async ([isNmapInstalled, isTsharkInstalled]) => {
+  state.isNmapInstalled = isNmapInstalled;
+  state.isTsharkInstalled = isTsharkInstalled;
+  
+  const missing = [];
+  if (!isNmapInstalled) missing.push({ name: 'Nmap', url: 'https://nmap.org/download.html' });
+  if (!isTsharkInstalled) missing.push({ name: 'Tshark (Wireshark)', url: 'https://www.wireshark.org/download.html' });
+  
+  if (missing.length > 0) {
+    const messageHtml = missing.map(m => 
+      `${m.name} is missing. <a href="${m.url}" target="_blank" style="color: #000; text-decoration: underline; font-weight: 600; margin-left: 5px;">Download ${m.name}</a>`
+    ).join('<br/>');
+    
+    // Inject dynamic HTML into the banner text container
+    if (elements.nmapInstallBanner) {
+      const bannerTextContainer = elements.nmapInstallBanner.querySelector('.banner-text');
+      if (bannerTextContainer) {
+        bannerTextContainer.innerHTML = messageHtml;
+      }
+      elements.nmapInstallBanner.style.display = 'block';
+    }
   } else {
+    // Both installed, process Nmap scripts
     state.nmapScripts = await api.getNmapScripts();
     console.log(`Loaded ${state.nmapScripts?.length || 0} native Nmap scripts from backend.`);
     // Reveal Nmap scan-all options
@@ -30,9 +48,11 @@ api.checkNmap().then(async (installed) => {
   }
 });
 
-elements.btnCloseNmapBanner.addEventListener('click', () => {
-  elements.nmapInstallBanner.style.display = 'none';
-});
+if (elements.btnCloseNmapBanner) {
+  elements.btnCloseNmapBanner.addEventListener('click', () => {
+    if (elements.nmapInstallBanner) elements.nmapInstallBanner.style.display = 'none';
+  });
+}
 
 // --- Settings Modal Logic ---
 const btnSettings = document.getElementById('btn-settings');

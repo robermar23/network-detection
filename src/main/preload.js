@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Nmap Triggers
   checkNmap: () => ipcRenderer.invoke(IPC_CHANNELS.CHECK_NMAP),
+  checkTshark: () => ipcRenderer.invoke(IPC_CHANNELS.CHECK_TSHARK),
   getNmapScripts: () => ipcRenderer.invoke(IPC_CHANNELS.GET_NMAP_SCRIPTS),
   runNmapScan: (type, targetObj) => ipcRenderer.invoke(IPC_CHANNELS.RUN_NMAP_SCAN, { type, target: targetObj }),
   runNcat: (payloadObj) => ipcRenderer.invoke(IPC_CHANNELS.RUN_NCAT, payloadObj),

@@ -1,5 +1,6 @@
 export const api = {
   checkNmap: async () => window.electronAPI.checkNmap(),
+  checkTshark: async () => window.electronAPI.checkTshark(),
   getNmapScripts: async () => window.electronAPI.getNmapScripts(),
   getInterfaces: async () => window.electronAPI.getInterfaces(),
   scanNetwork: async (subnet) => window.electronAPI.scanNetwork(subnet),

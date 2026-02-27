@@ -27,7 +27,6 @@ export const IPC_CHANNELS = {
 
   // Nmap Channels
   CHECK_NMAP: 'check-nmap',
-  CHECK_TSHARK: 'check-tshark',
   RUN_NMAP_SCAN: 'run-nmap-scan',
   CANCEL_NMAP_SCAN: 'cancel-nmap-scan',
   GET_NMAP_SCRIPTS: 'get-nmap-scripts',

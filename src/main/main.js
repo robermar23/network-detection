@@ -135,11 +135,6 @@ ipcMain.handle(IPC_CHANNELS.CHECK_NMAP, async () => {
   return await checkNmapInstalled();
 });
 
-ipcMain.handle(IPC_CHANNELS.CHECK_TSHARK, async () => {
-  const { isInstalled } = await checkTsharkInstalled();
-  return isInstalled;
-});
-
 // --- Settings Management ---
 
 ipcMain.handle(IPC_CHANNELS.GET_SETTING, (event, key) => {

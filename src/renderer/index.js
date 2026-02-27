@@ -16,11 +16,12 @@ function escapeHtml(unsafe) {
 }
 
 // --- Initialization ---
-api.checkNmap().then(async (installed) => {
-  state.isNmapInstalled = installed;
-  if (!installed) {
-    elements.nmapInstallBanner.style.display = 'block';
-  } else {
+Promise.all([api.checkNmap(), api.settings.checkDependency('tshark')]).then(async ([isNmapInstalled, tsharkStatus]) => {
+  const isTsharkInstalled = tsharkStatus ? tsharkStatus.installed : false;
+  state.isNmapInstalled = isNmapInstalled;
+  state.isTsharkInstalled = isTsharkInstalled;
+  
+  if (isNmapInstalled) {
     state.nmapScripts = await api.getNmapScripts();
     console.log(`Loaded ${state.nmapScripts?.length || 0} native Nmap scripts from backend.`);
     // Reveal Nmap scan-all options
@@ -28,11 +29,39 @@ api.checkNmap().then(async (installed) => {
       el.style.display = 'flex';
     });
   }
+  
+  const missing = [];
+  if (!isNmapInstalled) missing.push({ name: 'Nmap', url: 'https://nmap.org/download.html' });
+  if (!isTsharkInstalled) missing.push({ name: 'Tshark (Wireshark)', url: 'https://www.wireshark.org/download.html' });
+  
+  if (missing.length > 0) {
+    if (elements.nmapInstallBanner) {
+      const bannerTextContainer = elements.nmapInstallBanner.querySelector('.banner-text');
+      if (bannerTextContainer) {
+        bannerTextContainer.textContent = ''; // Clear previous
+        missing.forEach((m, idx) => {
+          if (idx > 0) bannerTextContainer.appendChild(document.createElement('br'));
+          bannerTextContainer.appendChild(document.createTextNode(`${m.name} is missing. `));
+          
+          const link = document.createElement('a');
+          link.href = m.url;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.style.cssText = 'color: #000; text-decoration: underline; font-weight: 600; margin-left: 5px;';
+          link.textContent = `Download ${m.name}`;
+          bannerTextContainer.appendChild(link);
+        });
+      }
+      elements.nmapInstallBanner.style.display = 'block';
+    }
+  }
 });
 
-elements.btnCloseNmapBanner.addEventListener('click', () => {
-  elements.nmapInstallBanner.style.display = 'none';
-});
+if (elements.btnCloseNmapBanner) {
+  elements.btnCloseNmapBanner.addEventListener('click', () => {
+    if (elements.nmapInstallBanner) elements.nmapInstallBanner.style.display = 'none';
+  });
+}
 
 // --- Settings Modal Logic ---
 const btnSettings = document.getElementById('btn-settings');

@@ -91,20 +91,14 @@ async function syncDependencyToggle({
 function openPanel(panelEl, sidebarResizerEl) {
   panelEl.style.display = 'flex';
   setTimeout(() => panelEl.classList.add('open'), 10);
-  sidebarResizerEl.style.display = 'block';
+  if (sidebarResizerEl) sidebarResizerEl.style.display = 'block';
 }
 
 function closePanel(panelEl, sidebarResizerEl) {
   panelEl.classList.remove('open');
   setTimeout(() => {
     panelEl.style.display = 'none';
-    const otherPanelOpen = panelEl === vlanPanel 
-      ? elements.detailsPanel.classList.contains('open')
-      : (vlanPanel && vlanPanel.classList.contains('open'));
-      
-    if (!otherPanelOpen) {
-      sidebarResizerEl.style.display = 'none';
-    }
+    if (sidebarResizerEl) sidebarResizerEl.style.display = 'none';
   }, 300);
 }
 
@@ -617,15 +611,12 @@ btnToggleVlanPanel.addEventListener('click', async () => {
   const isOpen = vlanPanel.classList.contains('open');
 
   if (!isOpen) {
-    // Close details panel if open
-    if (elements.detailsPanel.classList.contains('open')) {
-       elements.detailsPanel.classList.remove('open');
-    }
-    
-    openPanel(vlanPanel, elements.sidebarResizer);
+    const resizer = document.getElementById('vlan-resizer');
+    openPanel(vlanPanel, resizer);
     await refreshVlanInterfaces();
   } else {
-    closePanel(vlanPanel, elements.sidebarResizer);
+    const resizer = document.getElementById('vlan-resizer');
+    closePanel(vlanPanel, resizer);
   }
 });
 
@@ -1393,39 +1384,52 @@ function attachDetailsPanelListeners(host) {
 
 elements.btnCloseDetails.addEventListener('click', () => {
   elements.detailsPanel.classList.remove('open');
-  elements.sidebarResizer.style.display = 'none';
+  const detailsResizer = document.getElementById('sidebar-resizer');
+  if (detailsResizer) detailsResizer.style.display = 'none';
   elements.detailsPanel.style.width = '';
 });
 
 // Resizer logic
-let isResizing = false;
-let startX;
-let startWidth;
+function initResizer(resizerEl, panelEl) {
+  if (!resizerEl || !panelEl) return;
+  
+  let isResizing = false;
+  let startX;
+  let startWidth;
 
-elements.sidebarResizer.addEventListener('mousedown', (e) => {
-  isResizing = true;
-  startX = e.clientX;
-  startWidth = parseInt(document.defaultView.getComputedStyle(elements.detailsPanel).width, 10);
-  elements.sidebarResizer.classList.add('is-resizing');
-  document.body.style.cursor = 'col-resize';
-  e.preventDefault();
-});
+  resizerEl.addEventListener('mousedown', (e) => {
+    isResizing = true;
+    startX = e.clientX;
+    startWidth = parseInt(document.defaultView.getComputedStyle(panelEl).width, 10);
+    resizerEl.classList.add('is-resizing');
+    document.body.style.cursor = 'col-resize';
+    e.preventDefault();
+  });
 
-document.addEventListener('mousemove', (e) => {
-  if (!isResizing) return;
-  const newWidth = startWidth - (e.clientX - startX);
-  if (newWidth > 300 && newWidth < Math.min(800, window.innerWidth - 100)) {
-    elements.detailsPanel.style.width = `${newWidth}px`;
-  }
-});
+  document.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+    const newWidth = startWidth - (e.clientX - startX);
+    if (newWidth > 300 && newWidth < Math.min(800, window.innerWidth - 100)) {
+      panelEl.style.width = `${newWidth}px`;
+    }
+  });
 
-document.addEventListener('mouseup', () => {
-  if (isResizing) {
-    isResizing = false;
-    elements.sidebarResizer.classList.remove('is-resizing');
-    document.body.style.cursor = '';
-  }
-});
+  document.addEventListener('mouseup', () => {
+    if (isResizing) {
+      isResizing = false;
+      resizerEl.classList.remove('is-resizing');
+      document.body.style.cursor = '';
+    }
+  });
+}
+
+const vlanResizer = document.getElementById('vlan-resizer');
+const passiveResizer = document.getElementById('passive-resizer');
+
+initResizer(vlanResizer, vlanPanel);
+// passivePanel gets initialized at bottom of file after element is defined
+// elements.sidebarResizer manages detailsPanel
+initResizer(elements.sidebarResizer, elements.detailsPanel);
 
 function getSecurityBadgeData(host) {
   let posture = 'Unknown';
@@ -2550,13 +2554,12 @@ async function refreshPassiveInterfaces() {
 
 btnTogglePassivePanel?.addEventListener('click', async () => {
   if (passivePanel.style.display === 'none' || !passivePanel.classList.contains('open')) {
-    if (elements.detailsPanel.classList.contains('open')) elements.detailsPanel.classList.remove('open');
-    if (vlanPanel && vlanPanel.classList.contains('open')) closePanel(vlanPanel, elements.sidebarResizer);
-    
-    openPanel(passivePanel, elements.sidebarResizer);
+    const resizer = document.getElementById('passive-resizer');
+    openPanel(passivePanel, resizer);
     await refreshPassiveInterfaces();
   } else {
-    closePanel(passivePanel, elements.sidebarResizer);
+    const resizer = document.getElementById('passive-resizer');
+    closePanel(passivePanel, resizer);
   }
 });
 

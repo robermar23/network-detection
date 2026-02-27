@@ -39,7 +39,7 @@ export async function exportPcap(mainWindow, interfaceId, hostIp, durationStr, o
 
     exportingProcess.stderr.on('data', (data) => {
       const msg = data.toString();
-      if (msg.includes('Packets captured:')) {
+      if (msg.includes('packets captured') || msg.includes('packet captured')) {
          packetCountLine = msg;
       }
     });
@@ -47,7 +47,7 @@ export async function exportPcap(mainWindow, interfaceId, hostIp, durationStr, o
     exportingProcess.on('close', (code) => {
       exportingProcess = null;
       let packetCount = 0;
-      const match = packetCountLine.match(/Packets captured:\s+(\d+)/);
+      const match = packetCountLine.match(/(\d+)\s+packets?\s+captured/i);
       if (match) packetCount = parseInt(match[1], 10);
 
       if (onComplete) onComplete({ filePath, packetCount, duration, status: 'complete' });

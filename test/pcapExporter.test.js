@@ -96,7 +96,7 @@ describe('PCAP Exporter', () => {
       const onComplete = vi.fn();
       await exportPcap({}, 'eth0', '', '60', onComplete, vi.fn());
       
-      mockProc.stderr.emit('data', Buffer.from('Packets captured: 1542\n'));
+      mockProc.stderr.emit('data', Buffer.from('1542 packets captured\n'));
       mockProc.emit('close', 0);
       
       expect(onComplete).toHaveBeenCalledWith({

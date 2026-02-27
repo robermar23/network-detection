@@ -63,6 +63,57 @@ if (elements.btnCloseNmapBanner) {
   });
 }
 
+// --- Sidecar Engine Checks ---
+api.checkRustEngine().then(r => {
+  state.rustEngineAvailable = r && r.available;
+  document.querySelectorAll('.rust-engine-only').forEach(el => {
+    el.style.display = state.rustEngineAvailable ? '' : 'none';
+  });
+  // Update settings modal status
+  const statusEl = document.getElementById('status-rust-engine');
+  if (statusEl) {
+    const dot = statusEl.querySelector('.status-dot');
+    const text = statusEl.querySelector('.status-text');
+    if (state.rustEngineAvailable) {
+      statusEl.classList.add('installed');
+      statusEl.classList.remove('missing');
+      if (dot) dot.style.background = 'var(--success)';
+      if (text) text.textContent = 'Running';
+    } else {
+      statusEl.classList.add('missing');
+      statusEl.classList.remove('installed');
+      if (text) text.textContent = 'Not available (binary not found)';
+    }
+  }
+}).catch(() => {
+  state.rustEngineAvailable = false;
+});
+
+api.checkReportsEngine().then(r => {
+  state.reportsEngineAvailable = r && r.available;
+  document.querySelectorAll('.reports-engine-only').forEach(el => {
+    el.style.display = state.reportsEngineAvailable ? '' : 'none';
+  });
+  // Update settings modal status
+  const statusEl = document.getElementById('status-reports-engine');
+  if (statusEl) {
+    const dot = statusEl.querySelector('.status-dot');
+    const text = statusEl.querySelector('.status-text');
+    if (state.reportsEngineAvailable) {
+      statusEl.classList.add('installed');
+      statusEl.classList.remove('missing');
+      if (dot) dot.style.background = 'var(--success)';
+      if (text) text.textContent = 'Available';
+    } else {
+      statusEl.classList.add('missing');
+      statusEl.classList.remove('installed');
+      if (text) text.textContent = 'Not available (binary not found)';
+    }
+  }
+}).catch(() => {
+  state.reportsEngineAvailable = false;
+});
+
 // --- Settings Modal Logic ---
 const btnSettings = document.getElementById('btn-settings');
 const settingsModalOverlay = document.getElementById('settings-modal-overlay');

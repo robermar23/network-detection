@@ -33,6 +33,8 @@ import { startDnsHarvesting, stopDnsHarvesting } from './dnsHarvester.js';
 import { startArpDetection, stopArpDetection } from './arpSpoofDetector.js';
 import { exportPcap } from './pcapExporter.js';
 import { stopAll as stopAllPassive } from './passiveCapture.js';
+import { initRustEngine, shutdownRustEngine, isRustEngineRunning, rustRpc } from './engines/rustEngine.js';
+import { runExport, isReportsEngineAvailable } from './engines/reportsEngine.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -51,6 +53,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow();
+  initRustEngine();
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -84,6 +87,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', function () {
+  shutdownRustEngine();
   if (process.platform !== 'darwin') app.quit();
 });
 
@@ -525,4 +529,145 @@ ipcMain.handle(IPC_CHANNELS.PROBE_HOST, async (event, ip) => {
   } catch (e) {
     return { ip, error: e.message, alive: false };
   }
+});
+
+// --- Sidecar Engine Status ---
+
+ipcMain.handle(IPC_CHANNELS.RUST_ENGINE_STATUS, async () => {
+  return { available: isRustEngineRunning() };
+});
+
+ipcMain.handle(IPC_CHANNELS.REPORTS_ENGINE_STATUS, async () => {
+  return { available: isReportsEngineAvailable() };
+});
+
+// --- Scan Profiles (Rust Engine) ---
+
+ipcMain.handle(IPC_CHANNELS.PROFILE_LIST, async () => {
+  if (!isRustEngineRunning()) return { status: 'unavailable' };
+  try {
+    return { status: 'success', data: await rustRpc('profiles.list') };
+  } catch (err) {
+    return { status: 'error', error: err.message || err };
+  }
+});
+
+ipcMain.handle(IPC_CHANNELS.PROFILE_GET, async (event, name) => {
+  if (!isRustEngineRunning()) return { status: 'unavailable' };
+  try {
+    return { status: 'success', data: await rustRpc('profiles.get', { name }) };
+  } catch (err) {
+    return { status: 'error', error: err.message || err };
+  }
+});
+
+ipcMain.handle(IPC_CHANNELS.PROFILE_CREATE, async (event, profile) => {
+  if (!isRustEngineRunning()) return { status: 'unavailable' };
+  try {
+    return { status: 'success', data: await rustRpc('profiles.create', { profile }) };
+  } catch (err) {
+    return { status: 'error', error: err.message || err };
+  }
+});
+
+ipcMain.handle(IPC_CHANNELS.PROFILE_UPDATE, async (event, { name, profile }) => {
+  if (!isRustEngineRunning()) return { status: 'unavailable' };
+  try {
+    return { status: 'success', data: await rustRpc('profiles.update', { name, profile }) };
+  } catch (err) {
+    return { status: 'error', error: err.message || err };
+  }
+});
+
+ipcMain.handle(IPC_CHANNELS.PROFILE_DELETE, async (event, name) => {
+  if (!isRustEngineRunning()) return { status: 'unavailable' };
+  try {
+    return { status: 'success', data: await rustRpc('profiles.delete', { name }) };
+  } catch (err) {
+    return { status: 'error', error: err.message || err };
+  }
+});
+
+ipcMain.handle(IPC_CHANNELS.PROFILE_VALIDATE, async (event, profile) => {
+  if (!isRustEngineRunning()) return { status: 'unavailable' };
+  try {
+    return { status: 'success', data: await rustRpc('profiles.validate', { profile }) };
+  } catch (err) {
+    return { status: 'error', error: err.message || err };
+  }
+});
+
+// --- Baseline & Diff (Rust Engine) ---
+
+ipcMain.handle(IPC_CHANNELS.BASELINE_SNAPSHOT, async (event, { hosts, label }) => {
+  if (!isRustEngineRunning()) return { status: 'unavailable' };
+  try {
+    return { status: 'success', data: await rustRpc('baseline.createSnapshot', { hosts, label }) };
+  } catch (err) {
+    return { status: 'error', error: err.message || err };
+  }
+});
+
+ipcMain.handle(IPC_CHANNELS.BASELINE_LIST, async () => {
+  if (!isRustEngineRunning()) return { status: 'unavailable' };
+  try {
+    return { status: 'success', data: await rustRpc('baseline.listSnapshots') };
+  } catch (err) {
+    return { status: 'error', error: err.message || err };
+  }
+});
+
+ipcMain.handle(IPC_CHANNELS.BASELINE_GET, async (event, id) => {
+  if (!isRustEngineRunning()) return { status: 'unavailable' };
+  try {
+    return { status: 'success', data: await rustRpc('baseline.getSnapshot', { id }) };
+  } catch (err) {
+    return { status: 'error', error: err.message || err };
+  }
+});
+
+ipcMain.handle(IPC_CHANNELS.BASELINE_DELETE, async (event, id) => {
+  if (!isRustEngineRunning()) return { status: 'unavailable' };
+  try {
+    return { status: 'success', data: await rustRpc('baseline.delete', { id }) };
+  } catch (err) {
+    return { status: 'error', error: err.message || err };
+  }
+});
+
+ipcMain.handle(IPC_CHANNELS.BASELINE_DIFF, async (event, { baselineId, currentHosts }) => {
+  if (!isRustEngineRunning()) return { status: 'unavailable' };
+  try {
+    return { status: 'success', data: await rustRpc('baseline.diff', { baselineId, currentHosts }) };
+  } catch (err) {
+    return { status: 'error', error: err.message || err };
+  }
+});
+
+// --- Service Fingerprinting (Rust Engine) ---
+
+ipcMain.handle(IPC_CHANNELS.FINGERPRINT_ANALYZE, async (event, { host, ports }) => {
+  if (!isRustEngineRunning()) return { status: 'unavailable' };
+  try {
+    return { status: 'success', data: await rustRpc('fingerprint.analyze', { host, ports }) };
+  } catch (err) {
+    return { status: 'error', error: err.message || err };
+  }
+});
+
+// --- Topology Builder (Rust Engine) ---
+
+ipcMain.handle(IPC_CHANNELS.TOPOLOGY_BUILD, async (event, { hosts, fingerprints }) => {
+  if (!isRustEngineRunning()) return { status: 'unavailable' };
+  try {
+    return { status: 'success', data: await rustRpc('topology.build', { hosts, fingerprints }) };
+  } catch (err) {
+    return { status: 'error', error: err.message || err };
+  }
+});
+
+// --- Report Export (Go Engine) ---
+
+ipcMain.handle(IPC_CHANNELS.EXPORT_REPORT, async (event, opts) => {
+  return await runExport(mainWindow, opts);
 });

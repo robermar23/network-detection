@@ -46,7 +46,16 @@ export const elements = {
   btnBlacklistAdd: document.getElementById('btn-blacklist-add'),
   blacklistEntries: document.getElementById('blacklist-entries'),
   blacklistCount: document.getElementById('blacklist-count'),
-  btnBlacklistDone: document.getElementById('btn-blacklist-done')
+  btnBlacklistDone: document.getElementById('btn-blacklist-done'),
+  // Sidecar Engine UI
+  btnProfiles: document.getElementById('btn-profiles'),
+  btnExportReport: document.getElementById('btn-export-report'),
+  btnViewTopology: document.getElementById('btn-view-topology'),
+  profileModalOverlay: document.getElementById('profile-modal-overlay'),
+  exportModalOverlay: document.getElementById('export-modal-overlay'),
+  topologyContainer: document.getElementById('topology-container'),
+  btnSetBaseline: document.getElementById('btn-set-baseline'),
+  baselineSelect: document.getElementById('baseline-select')
 };
 
 export const domUtils = {
@@ -56,6 +65,20 @@ export const domUtils = {
     elements.btnViewGrid.classList.toggle('active', state.currentView === 'grid');
     elements.btnViewList.classList.toggle('active', state.currentView === 'list');
     elements.btnViewTable.classList.toggle('active', state.currentView === 'table');
+    if (elements.btnViewTopology) {
+      elements.btnViewTopology.classList.toggle('active', state.currentView === 'topology');
+    }
+
+    // Toggle topology container vs host grid
+    if (state.currentView === 'topology') {
+      elements.hostGrid.style.display = 'none';
+      if (elements.topologyContainer) elements.topologyContainer.style.display = 'block';
+      return;
+    } else {
+      elements.hostGrid.style.display = '';
+      if (elements.topologyContainer) elements.topologyContainer.style.display = 'none';
+    }
+
     elements.hostGrid.className = `host-${state.currentView}`;
     
     if (state.currentView === 'table' && state.hosts.length > 0) {

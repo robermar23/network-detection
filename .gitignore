@@ -27,3 +27,8 @@ dist-ssr
 dist/*
 release/*
 coverage/
+
+# Sidecar Engine Build Artifacts
+engines/rust-core/target/
+engines/go-reports/netspectre-reports
+engines/go-reports/netspectre-reports.exe

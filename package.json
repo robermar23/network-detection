@@ -17,6 +17,9 @@
   "scripts": {
     "build:preload": "esbuild src/main/preload.js --bundle --format=cjs --outfile=src/main/preload.cjs --external:electron",
     "dev": "npm run build:preload && concurrently -k \"vite\" \"cross-env NODE_ENV=development electron .\"",
+    "build:rust": "cd engines/rust-core && cargo build --release",
+    "build:go": "cd engines/go-reports && go build -o netspectre-reports .",
+    "build:engines": "npm run build:rust && npm run build:go",
     "build": "npm run build:preload && vite build",
     "dist": "npm run build && electron-builder",
     "preview": "vite preview",
@@ -106,6 +109,18 @@
     "appImage": {
       "license": "LICENSE"
     },
+    "extraResources": [
+      {
+        "from": "engines/rust-core/target/release/",
+        "to": "engines/",
+        "filter": ["netspectre-engine", "netspectre-engine.exe"]
+      },
+      {
+        "from": "engines/go-reports/",
+        "to": "engines/",
+        "filter": ["netspectre-reports", "netspectre-reports.exe"]
+      }
+    ],
     "publish": [
       {
         "provider": "github",

@@ -15,5 +15,21 @@ export const state = {
     arp: { running: false, alerts: [] },
   },
   passiveInterface: '', // Currently selected interface for passive capture
-  pcapExporting: false
+  pcapExporting: false,
+  // Scan Profiles (Rust Engine)
+  profiles: [],
+  activeProfile: null,
+  // Baseline & Diff (Rust Engine)
+  baselines: [],
+  currentDiff: null,
+  isComparing: false,
+  // Service Fingerprinting
+  fingerprints: {},
+  // Topology
+  topology: null,
+  // Export
+  isExporting: false,
+  // Engine availability
+  rustEngineAvailable: false,
+  reportsEngineAvailable: false
 };

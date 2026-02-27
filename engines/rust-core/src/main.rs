@@ -118,7 +118,7 @@ fn dispatch(
         "profiles.validate" => {
             let profile: Profile = extract_param(&params, "profile")?;
             match profile_mgr.validate(&profile) {
-                Ok(_) => Ok(serde_json::json!({ "valid": true, "errors": [] as [String; 0] })),
+                Ok(_) => Ok(serde_json::json!({ "valid": true, "errors": serde_json::Value::Array(vec![]) })),
                 Err((_, msg)) => Ok(serde_json::json!({ "valid": false, "errors": [msg] })),
             }
         }

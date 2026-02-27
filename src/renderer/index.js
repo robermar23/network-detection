@@ -16,35 +16,44 @@ function escapeHtml(unsafe) {
 }
 
 // --- Initialization ---
-Promise.all([api.checkNmap(), api.checkTshark()]).then(async ([isNmapInstalled, isTsharkInstalled]) => {
+Promise.all([api.checkNmap(), api.settings.checkDependency('tshark')]).then(async ([isNmapInstalled, tsharkStatus]) => {
+  const isTsharkInstalled = tsharkStatus ? tsharkStatus.installed : false;
   state.isNmapInstalled = isNmapInstalled;
   state.isTsharkInstalled = isTsharkInstalled;
   
-  const missing = [];
-  if (!isNmapInstalled) missing.push({ name: 'Nmap', url: 'https://nmap.org/download.html' });
-  if (!isTsharkInstalled) missing.push({ name: 'Tshark (Wireshark)', url: 'https://www.wireshark.org/download.html' });
-  
-  if (missing.length > 0) {
-    const messageHtml = missing.map(m => 
-      `${m.name} is missing. <a href="${m.url}" target="_blank" style="color: #000; text-decoration: underline; font-weight: 600; margin-left: 5px;">Download ${m.name}</a>`
-    ).join('<br/>');
-    
-    // Inject dynamic HTML into the banner text container
-    if (elements.nmapInstallBanner) {
-      const bannerTextContainer = elements.nmapInstallBanner.querySelector('.banner-text');
-      if (bannerTextContainer) {
-        bannerTextContainer.innerHTML = messageHtml;
-      }
-      elements.nmapInstallBanner.style.display = 'block';
-    }
-  } else {
-    // Both installed, process Nmap scripts
+  if (isNmapInstalled) {
     state.nmapScripts = await api.getNmapScripts();
     console.log(`Loaded ${state.nmapScripts?.length || 0} native Nmap scripts from backend.`);
     // Reveal Nmap scan-all options
     document.querySelectorAll('.scan-all-option.nmap-only').forEach(el => {
       el.style.display = 'flex';
     });
+  }
+  
+  const missing = [];
+  if (!isNmapInstalled) missing.push({ name: 'Nmap', url: 'https://nmap.org/download.html' });
+  if (!isTsharkInstalled) missing.push({ name: 'Tshark (Wireshark)', url: 'https://www.wireshark.org/download.html' });
+  
+  if (missing.length > 0) {
+    if (elements.nmapInstallBanner) {
+      const bannerTextContainer = elements.nmapInstallBanner.querySelector('.banner-text');
+      if (bannerTextContainer) {
+        bannerTextContainer.textContent = ''; // Clear previous
+        missing.forEach((m, idx) => {
+          if (idx > 0) bannerTextContainer.appendChild(document.createElement('br'));
+          bannerTextContainer.appendChild(document.createTextNode(`${m.name} is missing. `));
+          
+          const link = document.createElement('a');
+          link.href = m.url;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.style.cssText = 'color: #000; text-decoration: underline; font-weight: 600; margin-left: 5px;';
+          link.textContent = `Download ${m.name}`;
+          bannerTextContainer.appendChild(link);
+        });
+      }
+      elements.nmapInstallBanner.style.display = 'block';
+    }
   }
 });
 

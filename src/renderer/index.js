@@ -2342,14 +2342,30 @@ if (window.electronAPI) {
   const passiveInterfaceSelect = document.getElementById('passive-interface-select');
 
   const passiveModulesConfig = {
-    dhcp: { type: 'card', waitHtml: '' },
-    creds: { type: 'table', waitHtml: '<tr><td colspan="5" style="text-align:center; color: var(--text-muted); padding: 12px;">Waiting for data...</td></tr>', requiresConsent: true },
-    dns:  { type: 'table', waitHtml: '<tr><td colspan="3" style="text-align:center; color: var(--text-muted); padding: 12px;">Waiting for data...</td></tr>' },
-    arp:  { type: 'card', waitHtml: '' }
+    dhcp: { type: 'card', getWaitEl: () => null },
+    creds: { type: 'table', requiresConsent: true, getWaitEl: () => {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 5;
+      td.style.cssText = 'text-align:center; color: var(--text-muted); padding: 12px;';
+      td.textContent = 'Waiting for data...';
+      tr.appendChild(td);
+      return tr;
+    } },
+    dns:  { type: 'table', getWaitEl: () => {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 3;
+      td.style.cssText = 'text-align:center; color: var(--text-muted); padding: 12px;';
+      td.textContent = 'Waiting for data...';
+      tr.appendChild(td);
+      return tr;
+    } },
+    arp:  { type: 'card', getWaitEl: () => null }
   };
 
   async function handlePassiveToggle(moduleKey, iface) {
-    const { requiresConsent, waitHtml } = passiveModulesConfig[moduleKey];
+    const { requiresConsent, getWaitEl } = passiveModulesConfig[moduleKey];
     const moduleUi = ui[moduleKey];
 
     if (moduleUi.toggle.checked) {
@@ -2366,7 +2382,13 @@ if (window.electronAPI) {
 
       moduleUi.status.textContent = 'Capturing';
       moduleUi.status.className = 'passive-status capturing';
-      moduleUi.results.innerHTML = waitHtml || '';
+      
+      moduleUi.results.textContent = '';
+      const waitEl = getWaitEl();
+      if (waitEl) {
+        moduleUi.results.appendChild(waitEl);
+      }
+      
       moduleUi.badge.textContent = '0';
       state.passiveModules[moduleKey].running = true;
 

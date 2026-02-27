@@ -58,6 +58,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onNmapScanComplete: (callback) => ipcRenderer.on(IPC_CHANNELS.NMAP_SCAN_COMPLETE, (_event, value) => callback(value)),
   onNmapScanError: (callback) => ipcRenderer.on(IPC_CHANNELS.NMAP_SCAN_ERROR, (_event, value) => callback(value)),
 
+  // Passive Network Intelligence
+  startPassiveCapture: (moduleId, interfaceId, options) => ipcRenderer.invoke(IPC_CHANNELS.START_PASSIVE_CAPTURE, { moduleId, interfaceId, options }),
+  stopPassiveCapture: (moduleId) => ipcRenderer.invoke(IPC_CHANNELS.STOP_PASSIVE_CAPTURE, moduleId),
+  stopAllPassive: () => ipcRenderer.invoke(IPC_CHANNELS.STOP_ALL_PASSIVE),
+  exportPcap: (payload) => ipcRenderer.invoke(IPC_CHANNELS.EXPORT_PCAP, payload),
+
+  // Passive Event Listeners
+  onPassiveDhcpAlert: (callback) => ipcRenderer.on(IPC_CHANNELS.PASSIVE_DHCP_ALERT, (_event, value) => callback(value)),
+  onPassiveCredFound: (callback) => ipcRenderer.on(IPC_CHANNELS.PASSIVE_CRED_FOUND, (_event, value) => callback(value)),
+  onPassiveDnsHost: (callback) => ipcRenderer.on(IPC_CHANNELS.PASSIVE_DNS_HOST, (_event, value) => callback(value)),
+  onPassiveArpAlert: (callback) => ipcRenderer.on(IPC_CHANNELS.PASSIVE_ARP_ALERT, (_event, value) => callback(value)),
+  onPcapExportComplete: (callback) => ipcRenderer.on(IPC_CHANNELS.PCAP_EXPORT_COMPLETE, (_event, value) => callback(value)),
+  onPassiveStatusUpdate: (callback) => ipcRenderer.on(IPC_CHANNELS.PASSIVE_STATUS_UPDATE, (_event, value) => callback(value)),
+  onPassiveError: (callback) => {
+    ipcRenderer.on(IPC_CHANNELS.PASSIVE_DHCP_ERROR, (_event, value) => callback(value));
+    ipcRenderer.on(IPC_CHANNELS.PASSIVE_CRED_ERROR, (_event, value) => callback(value));
+    ipcRenderer.on(IPC_CHANNELS.PASSIVE_DNS_ERROR, (_event, value) => callback(value));
+    ipcRenderer.on(IPC_CHANNELS.PASSIVE_ARP_ERROR, (_event, value) => callback(value));
+    ipcRenderer.on(IPC_CHANNELS.PCAP_EXPORT_ERROR, (_event, value) => callback(value));
+  },
+  onPassiveCaptureComplete: (callback) => ipcRenderer.on(IPC_CHANNELS.PASSIVE_CAPTURE_COMPLETE, (_event, value) => callback(value)),
+
   // Cleanup listeners
   removeListeners: () => {
     ipcRenderer.removeAllListeners(IPC_CHANNELS.HOST_FOUND);
@@ -72,5 +94,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners(IPC_CHANNELS.TSHARK_VLAN_FOUND);
     ipcRenderer.removeAllListeners(IPC_CHANNELS.TSHARK_ERROR);
     ipcRenderer.removeAllListeners(IPC_CHANNELS.TSHARK_COMPLETE);
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_DHCP_ALERT);
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_CRED_FOUND);
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_DNS_HOST);
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_ARP_ALERT);
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_DHCP_ERROR);
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_CRED_ERROR);
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_DNS_ERROR);
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_ARP_ERROR);
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.PCAP_EXPORT_COMPLETE);
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.PCAP_EXPORT_ERROR);
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_CAPTURE_COMPLETE);
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_STATUS_UPDATE);
   }
 });

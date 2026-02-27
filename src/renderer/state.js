@@ -6,5 +6,14 @@ export const state = {
   isNmapInstalled: false,
   nmapScripts: [], // Store custom Nmap scripts catalog
   blacklist: [], // Blacklisted IPs/CIDRs/MACs
-  pendingHosts: [] // Staging area inside scope modal before committing
+  pendingHosts: [], // Staging area inside scope modal before committing
+  // Passive Network Intelligence
+  passiveModules: {
+    dhcp: { running: false, alerts: [] },
+    creds: { running: false, findings: [] },
+    dns: { running: false, hosts: new Map() },
+    arp: { running: false, alerts: [] },
+  },
+  passiveInterface: '', // Currently selected interface for passive capture
+  pcapExporting: false
 };

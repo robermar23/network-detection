@@ -116,6 +116,11 @@
             style="display: none;">
             <span class="icon">🦈</span> VLAN Discovery
           </button>
+          <div class="divider tshark-only" style="display: none;"></div>
+          <button id="btn-toggle-passive-panel" class="btn secondary tshark-only" title="Passive Intelligence"
+            style="display: none;">
+            <span class="icon">🕵️</span> Passive Intelligence
+          </button>
           <div class="divider"></div>
           <div class="view-toggles"
             style="display: flex; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 2px; border: 1px solid var(--border-glass);">
@@ -169,9 +174,8 @@
         </div>
       </main>
 
-      <!-- Resizer Handle -->
-      <div id="sidebar-resizer" class="resizer" style="display: none;"></div>
-
+      <!-- Resizer Handle for VLAN -->
+      <div id="vlan-resizer" class="resizer" style="display: none;"></div>
       <!-- VLAN Discovery Panel -->
       <aside id="vlan-panel" class="details-panel glass-panel" style="width: 380px; display: none;">
         <div class="panel-header"
@@ -211,6 +215,178 @@
         </div>
       </aside>
 
+      <!-- Resizer Handle for Passive -->
+      <div id="passive-resizer" class="resizer" style="display: none;"></div>
+      <!-- Passive Intelligence Panel -->
+      <aside id="passive-panel" class="details-panel glass-panel" style="width: 440px; display: none;">
+        <div class="panel-header"
+          style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px; margin-bottom: 16px;">
+          <h2 style="font-size: 16px; font-weight: 500; margin: 0; color: white;">🕵️ Passive Intelligence</h2>
+          <button id="btn-close-passive-panel" class="btn icon-only" title="Hide Panel"
+            style="color: var(--text-muted); padding: 4px;">✕</button>
+        </div>
+
+        <div id="passive-error-banner" class="nmap-banner"
+          style="display: none; position: relative; background: rgba(220, 53, 69, 0.9); color: white; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 13px;">
+          <strong>Capture Error:</strong> <span id="passive-error-text">Insufficient privileges.</span>
+          <div style="margin-top: 8px; font-size: 12px; opacity: 0.9;">
+            <strong>Windows:</strong> Run as Admin or configure Npcap.<br />
+            <strong>Linux:</strong> <code>sudo setcap cap_net_raw+eip $(which dumpcap)</code><br />
+            <strong>macOS:</strong> Add user to <code>access_bpf</code> group.
+          </div>
+          <button id="btn-close-passive-error" class="btn icon-only"
+            style="position: absolute; right: 5px; top: 5px; background: transparent; padding: 2px;">✕</button>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+          <select id="passive-interface-select" class="dropdown-select" style="flex-grow: 1;">
+            <option value="">Select Interface...</option>
+          </select>
+          <button id="btn-refresh-passive-interfaces" class="btn secondary icon-only"
+            title="Refresh Interfaces">🔄</button>
+          <button id="btn-stop-all-passive" class="btn danger-outline icon-only" title="Stop All">⏹️</button>
+          <button id="btn-export-pcap" class="btn info" title="Export PCAP">📥 PCAP</button>
+        </div>
+
+        <div class="passive-modules-grid"
+          style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;">
+          <!-- DHCP -->
+          <div class="passive-module-card glass-panel"
+            style="padding: 12px; border: 1px solid var(--border-glass); border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-weight: 500; font-size: 13px;">Rogue DHCP</span>
+              <label class="toggle-switch small"><input type="checkbox" id="toggle-dhcp"><span
+                  class="slider"></span></label>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+              <span id="status-dhcp" class="passive-status">Idle</span>
+              <span class="badge" id="badge-dhcp"
+                style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 10px;">0</span>
+            </div>
+          </div>
+          <!-- Creds -->
+          <div class="passive-module-card glass-panel"
+            style="padding: 12px; border: 1px solid var(--border-glass); border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-weight: 500; font-size: 13px;">Credentials</span>
+              <label class="toggle-switch small"><input type="checkbox" id="toggle-creds"><span
+                  class="slider"></span></label>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+              <span id="status-creds" class="passive-status">Idle</span>
+              <span class="badge" id="badge-creds"
+                style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 10px;">0</span>
+            </div>
+          </div>
+          <!-- DNS -->
+          <div class="passive-module-card glass-panel"
+            style="padding: 12px; border: 1px solid var(--border-glass); border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-weight: 500; font-size: 13px;">DNS Hosts</span>
+              <label class="toggle-switch small"><input type="checkbox" id="toggle-dns"><span
+                  class="slider"></span></label>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+              <span id="status-dns" class="passive-status">Idle</span>
+              <span class="badge" id="badge-dns"
+                style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 10px;">0</span>
+            </div>
+          </div>
+          <!-- ARP -->
+          <div class="passive-module-card glass-panel"
+            style="padding: 12px; border: 1px solid var(--border-glass); border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-weight: 500; font-size: 13px;">ARP Spoof</span>
+              <label class="toggle-switch small"><input type="checkbox" id="toggle-arp"><span
+                  class="slider"></span></label>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+              <span id="status-arp" class="passive-status">Idle</span>
+              <span class="badge" id="badge-arp"
+                style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 10px;">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Credential Disclaimer Banner -->
+        <div id="cred-disclaimer-banner"
+          style="display: none; background: rgba(255, 193, 7, 0.9); color: #111; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 12px; border-left: 4px solid #d39e00;">
+          <strong>⚠️ LEGAL WARNING</strong><br />
+          Capturing credentials may violate wiretapping laws. Ensure you have explicit authorization.
+          <div style="margin-top: 8px; text-align: right;">
+            <button id="btn-reject-creds" class="btn secondary"
+              style="font-size: 11px; padding: 4px 8px;">Cancel</button>
+            <button id="btn-accept-creds" class="btn primary" style="font-size: 11px; padding: 4px 8px;">Accept</button>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="modal-tabs" style="margin-bottom: 16px;">
+          <button class="modal-tab active" data-passive-tab="dhcp">DHCP</button>
+          <button class="modal-tab" data-passive-tab="creds">Creds</button>
+          <button class="modal-tab" data-passive-tab="dns">DNS</button>
+          <button class="modal-tab" data-passive-tab="arp">ARP</button>
+        </div>
+
+        <div style="border-top: 1px solid var(--border-glass); padding-top: 16px; flex-grow: 1; overflow-y: auto;">
+
+          <div id="tab-passive-dhcp" class="passive-tab-pane">
+            <div id="passive-results-dhcp" style="display: flex; flex-direction: column; gap: 8px;">
+              <div class="ds-record" style="text-align:center; color: var(--text-muted); opacity: 0.7;">Waiting for DHCP
+                data...</div>
+            </div>
+          </div>
+
+          <div id="tab-passive-creds" class="passive-tab-pane" style="display: none;">
+            <table class="data-table" style="width: 100%; font-size: 11px;">
+              <thead>
+                <tr>
+                  <th>Proto</th>
+                  <th>Source</th>
+                  <th>Dest</th>
+                  <th>User</th>
+                  <th>Pass</th>
+                </tr>
+              </thead>
+              <tbody id="passive-results-creds">
+                <tr>
+                  <td colspan="5" style="text-align:center; color: var(--text-muted); padding: 12px;">Waiting for
+                    credentials...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div id="tab-passive-dns" class="passive-tab-pane" style="display: none;">
+            <table class="data-table" style="width: 100%; font-size: 11px;">
+              <thead>
+                <tr>
+                  <th>Hostname</th>
+                  <th>Source IP</th>
+                  <th>Type</th>
+                </tr>
+              </thead>
+              <tbody id="passive-results-dns">
+                <tr>
+                  <td colspan="3" style="text-align:center; color: var(--text-muted); padding: 12px;">Waiting for DNS
+                    data...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div id="tab-passive-arp" class="passive-tab-pane" style="display: none;">
+            <div id="passive-results-arp" style="display: flex; flex-direction: column; gap: 8px;">
+              <div class="ds-record" style="text-align:center; color: var(--text-muted); opacity: 0.7;">Waiting for ARP
+                data...</div>
+            </div>
+          </div>
+
+        </div>
+      </aside>
+
+      <!-- Resizer Handle for Details -->
+      <div id="sidebar-resizer" class="resizer" style="display: none;"></div>
       <!-- Host Details Side Panel -->
       <aside id="details-panel" class="details-panel glass-panel">
         <div class="details-header">
@@ -396,6 +572,34 @@
       </div>
       <div class="modal-footer">
         <button id="btn-settings-done" class="btn primary">Save & Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PCAP Export Modal -->
+  <div id="pcap-modal-overlay" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width: 400px;">
+      <div class="modal-header">
+        <h2>📥 Export PCAP</h2>
+        <button id="btn-close-pcap-modal" class="btn icon-only modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Interface</label>
+          <select id="pcap-interface" class="dropdown-select full-width"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Host IP Filter (Optional)</label>
+          <input type="text" id="pcap-host-ip" class="text-input full-width" placeholder="e.g. 192.168.1.10">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Duration (seconds)</label>
+          <input type="number" id="pcap-duration" class="text-input full-width" value="60" min="1" max="3600">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-cancel-pcap" class="btn secondary">Cancel</button>
+        <button id="btn-start-pcap" class="btn primary">Start Export</button>
       </div>
     </div>
   </div>

@@ -30,5 +30,11 @@ export const api = {
   
   // Tshark (VLAN Discovery)
   startTsharkCapture: async (interfaceId) => window.electronAPI.startTsharkCapture(interfaceId),
-  stopTsharkCapture: async () => window.electronAPI.stopTsharkCapture()
+  stopTsharkCapture: async () => window.electronAPI.stopTsharkCapture(),
+
+  // Passive Network Intelligence
+  startPassiveCapture: async (moduleId, interfaceId, options) => window.electronAPI.startPassiveCapture(moduleId, interfaceId, options),
+  stopPassiveCapture: async (moduleId) => window.electronAPI.stopPassiveCapture(moduleId),
+  stopAllPassive: async () => window.electronAPI.stopAllPassive(),
+  exportPcap: async (payload) => window.electronAPI.exportPcap(payload)
 };

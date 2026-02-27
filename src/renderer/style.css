@@ -1427,3 +1427,73 @@ body {
 .scan-all-option .icon {
   font-size: 14px;
 }
+
+/* --- Passive Intelligence --- */
+.passive-module-card {
+  transition: all 0.2s ease;
+}
+.passive-module-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.passive-status {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.passive-status.capturing {
+  color: #3be282;
+  animation: pulse-text 2s infinite;
+}
+
+.passive-status.alerting {
+  color: #eb5e5e;
+  animation: pulse-text-danger 1s infinite;
+}
+
+@keyframes pulse-text {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; text-shadow: 0 0 8px rgba(59, 226, 130, 0.5); }
+}
+
+@keyframes pulse-text-danger {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; text-shadow: 0 0 8px rgba(235, 94, 94, 0.5); }
+}
+
+.passive-alert-card {
+  padding: 12px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.4);
+  border-left: 4px solid var(--primary);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11.5px;
+}
+
+.passive-alert-card.severity-critical {
+  border-left-color: var(--danger);
+  background: rgba(235, 94, 94, 0.05);
+}
+.passive-alert-card.severity-warning {
+  border-left-color: var(--warning);
+  background: rgba(243, 156, 18, 0.05);
+}
+.passive-alert-card.severity-info {
+  border-left-color: var(--primary);
+}
+
+.btn-promote {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.1);
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+.btn-promote:hover {
+  background: rgba(94, 114, 235, 0.4);
+}

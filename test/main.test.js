@@ -1,5 +1,38 @@
 import { describe, it, expect, vi } from 'vitest';
 import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
+import { spawn, exec } from 'child_process';
+import util from 'util';
+import ping from 'ping';
+
+// Mock child_process
+vi.mock('child_process', () => ({
+  spawn: vi.fn().mockReturnValue({
+    stdout: { on: vi.fn() },
+    stderr: { on: vi.fn() },
+    on: vi.fn(),
+    kill: vi.fn()
+  }),
+  exec: vi.fn((cmd, cb) => cb(null, { stdout: 'Mock Output' })),
+  execSync: vi.fn().mockReturnValue('mock sequence')
+}));
+
+// Mock util
+vi.mock('util', () => ({
+  promisify: vi.fn((fn) => fn),
+  default: { promisify: vi.fn((fn) => fn) }
+}));
+
+// Mock ping
+vi.mock('ping', () => ({
+  default: {
+    promise: {
+      probe: vi.fn().mockResolvedValue({ alive: true, time: 10 })
+    }
+  },
+  promise: {
+    probe: vi.fn().mockResolvedValue({ alive: true, time: 10 })
+  }
+}));
 
 // Mock electron completely
 vi.mock('electron', () => {

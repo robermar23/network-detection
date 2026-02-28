@@ -1,15 +1,12 @@
 import { spawn, exec, execSync } from 'child_process';
 import os from 'os';
-import { getSetting } from './store.js';
+import { getSetting, checkDependency } from './store.js';
 
 const activeScans = new Map(); // Store child processes by ID (ip or subnet)
 
-export function checkNmapInstalled() {
-  return new Promise((resolve) => {
-    exec('nmap -V', (error) => {
-      resolve(!error);
-    });
-  });
+export async function checkNmapInstalled() {
+  const result = await checkDependency('nmap');
+  return result.installed;
 }
 
 export function cancelNmapScan(id) {
@@ -110,11 +107,18 @@ export async function runNcat({ target, port, payload }, onResultCallback, onCom
   // We use -w 5 for a 5 second timeout so it doesn't hang forever if unresponsive.
   let args = ['-v', '-w', '10', target, port];
   
-  // Ncat path logic tries to assume Ncat lives relative to Nmap
+  // Ncat path logic assumes Ncat lives in the same directory as Nmap
   let ncatExecutable = 'ncat';
   const nmapStoredPath = getSetting('nmap.path');
-  if (nmapStoredPath && nmapStoredPath.toLowerCase().endsWith('nmap.exe')) {
-     ncatExecutable = nmapStoredPath.replace(/nmap\.exe$/i, 'ncat.exe');
+  if (nmapStoredPath) {
+    const dir = path.dirname(nmapStoredPath);
+    const nmapName = path.basename(nmapStoredPath);
+    // On Windows, nmap.exe -> ncat.exe. On Unix, nmap -> ncat.
+    const ncatName = nmapName.replace(/^nmap/i, 'ncat');
+    const potentialNcatPath = path.join(dir, ncatName);
+    if (fs.existsSync(potentialNcatPath)) {
+      ncatExecutable = potentialNcatPath;
+    }
   }
 
   console.log(`Starting Ncat on ${target}:${port} at ${ncatExecutable} with args:`, args.join(' '));

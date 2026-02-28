@@ -23,6 +23,51 @@ const schema = {
   }
 };
 
+const DEPENDENCY_PATHS = {
+  nmap: {
+    win32: [
+      'nmap',
+      'C:\\Program Files (x86)\\Nmap\\nmap.exe',
+      'C:\\Program Files\\Nmap\\nmap.exe'
+    ],
+    darwin: [
+      'nmap',
+      '/opt/homebrew/bin/nmap',
+      '/usr/local/bin/nmap',
+      '/usr/bin/nmap',
+      '/opt/local/bin/nmap',
+      '/sw/bin/nmap'
+    ],
+    linux: [
+      'nmap',
+      '/usr/bin/nmap',
+      '/usr/local/bin/nmap'
+    ],
+    versionArg: '-V'
+  },
+  tshark: {
+    win32: [
+      'tshark',
+      'C:\\Program Files\\Wireshark\\tshark.exe',
+      'C:\\Program Files (x86)\\Wireshark\\tshark.exe'
+    ],
+    darwin: [
+      'tshark',
+      '/opt/homebrew/bin/tshark',
+      '/usr/local/bin/tshark',
+      '/usr/bin/tshark',
+      '/opt/local/bin/tshark',
+      '/Applications/Wireshark.app/Contents/MacOS/tshark'
+    ],
+    linux: [
+      'tshark',
+      '/usr/bin/tshark',
+      '/usr/local/bin/tshark'
+    ],
+    versionArg: '-v'
+  }
+};
+
 const store = new Store({ schema });
 
 export function getSetting(key) {
@@ -38,30 +83,20 @@ export function getAllSettings() {
 }
 
 export async function checkDependency(toolName) {
-  let commandsToCheck = [];
-
-  if (toolName === 'nmap') {
-    commandsToCheck = [
-      { cmd: 'nmap -V', path: 'nmap' }, // Check global PATH first
-      { cmd: '"C:\\Program Files (x86)\\Nmap\\nmap.exe" -V', path: 'C:\\Program Files (x86)\\Nmap\\nmap.exe' },
-      { cmd: '"C:\\Program Files\\Nmap\\nmap.exe" -V', path: 'C:\\Program Files\\Nmap\\nmap.exe' },
-      // macOS common paths
-      { cmd: '/opt/homebrew/bin/nmap -V', path: '/opt/homebrew/bin/nmap' },
-      { cmd: '/usr/local/bin/nmap -V', path: '/usr/local/bin/nmap' }
-    ];
-  } else if (toolName === 'tshark') {
-    commandsToCheck = [
-      { cmd: 'tshark -v', path: 'tshark' }, // Check global PATH first
-      { cmd: '"C:\\Program Files\\Wireshark\\tshark.exe" -v', path: 'C:\\Program Files\\Wireshark\\tshark.exe' },
-      { cmd: '"C:\\Program Files (x86)\\Wireshark\\tshark.exe" -v', path: 'C:\\Program Files (x86)\\Wireshark\\tshark.exe' },
-      // macOS common paths
-      { cmd: '/opt/homebrew/bin/tshark -v', path: '/opt/homebrew/bin/tshark' },
-      { cmd: '/usr/local/bin/tshark -v', path: '/usr/local/bin/tshark' },
-      { cmd: '/Applications/Wireshark.app/Contents/MacOS/tshark -v', path: '/Applications/Wireshark.app/Contents/MacOS/tshark' }
-    ];
-  } else {
+  const config = DEPENDENCY_PATHS[toolName];
+  if (!config) {
     throw new Error(`Unknown tool: ${toolName}`);
   }
+
+  const platform = process.platform;
+  // Fallback to linux paths if platform not specifically defined
+  const paths = config[platform] || config.linux || [];
+  const versionArg = config.versionArg;
+
+  const commandsToCheck = paths.map(p => ({
+    cmd: p.includes(' ') || p.includes('\\') ? `"${p}" ${versionArg}` : `${p} ${versionArg}`,
+    path: p
+  }));
 
   let lastError;
   for (const { cmd, path } of commandsToCheck) {

@@ -47,7 +47,10 @@ export async function checkDependency(toolName) {
       { cmd: '"C:\\Program Files\\Nmap\\nmap.exe" -V', path: 'C:\\Program Files\\Nmap\\nmap.exe' },
       // macOS common paths
       { cmd: '/opt/homebrew/bin/nmap -V', path: '/opt/homebrew/bin/nmap' },
-      { cmd: '/usr/local/bin/nmap -V', path: '/usr/local/bin/nmap' }
+      { cmd: '/usr/local/bin/nmap -V', path: '/usr/local/bin/nmap' },
+      { cmd: '/usr/bin/nmap -V', path: '/usr/bin/nmap' }, // Linux standard
+      { cmd: '/opt/local/bin/nmap -V', path: '/opt/local/bin/nmap' }, // MacPorts
+      { cmd: '/sw/bin/nmap -V', path: '/sw/bin/nmap' } // Fink
     ];
   } else if (toolName === 'tshark') {
     commandsToCheck = [
@@ -57,6 +60,8 @@ export async function checkDependency(toolName) {
       // macOS common paths
       { cmd: '/opt/homebrew/bin/tshark -v', path: '/opt/homebrew/bin/tshark' },
       { cmd: '/usr/local/bin/tshark -v', path: '/usr/local/bin/tshark' },
+      { cmd: '/usr/bin/tshark -v', path: '/usr/bin/tshark' }, // Linux standard
+      { cmd: '/opt/local/bin/tshark -v', path: '/opt/local/bin/tshark' }, // MacPorts
       { cmd: '/Applications/Wireshark.app/Contents/MacOS/tshark -v', path: '/Applications/Wireshark.app/Contents/MacOS/tshark' }
     ];
   } else {

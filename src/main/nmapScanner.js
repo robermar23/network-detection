@@ -107,14 +107,17 @@ export async function runNcat({ target, port, payload }, onResultCallback, onCom
   // We use -w 5 for a 5 second timeout so it doesn't hang forever if unresponsive.
   let args = ['-v', '-w', '10', target, port];
   
-  // Ncat path logic tries to assume Ncat lives relative to Nmap
+  // Ncat path logic assumes Ncat lives in the same directory as Nmap
   let ncatExecutable = 'ncat';
   const nmapStoredPath = getSetting('nmap.path');
   if (nmapStoredPath) {
-    if (nmapStoredPath.toLowerCase().endsWith('nmap.exe')) {
-      ncatExecutable = nmapStoredPath.replace(/nmap\.exe$/i, 'ncat.exe');
-    } else if (nmapStoredPath.endsWith('/nmap')) {
-      ncatExecutable = nmapStoredPath.replace(/\/nmap$/, '/ncat');
+    const dir = path.dirname(nmapStoredPath);
+    const nmapName = path.basename(nmapStoredPath);
+    // On Windows, nmap.exe -> ncat.exe. On Unix, nmap -> ncat.
+    const ncatName = nmapName.replace(/^nmap/i, 'ncat');
+    const potentialNcatPath = path.join(dir, ncatName);
+    if (fs.existsSync(potentialNcatPath)) {
+      ncatExecutable = potentialNcatPath;
     }
   }
 

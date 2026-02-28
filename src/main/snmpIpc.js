@@ -9,6 +9,7 @@ export function registerSnmpHandlers(ipcMain, mainWindow) {
       (progressData) => mainWindow?.webContents.send(IPC_CHANNELS.SNMP_WALK_PROGRESS, progressData),
       (completeData) => mainWindow?.webContents.send(IPC_CHANNELS.SNMP_WALK_COMPLETE, completeData),
       (errorData)    => mainWindow?.webContents.send(IPC_CHANNELS.SNMP_WALK_ERROR, errorData),
+      (intelData)    => mainWindow?.webContents.send(IPC_CHANNELS.SNMP_INTEL, intelData)
     );
     return { status: success ? 'started' : 'failed' };
   });

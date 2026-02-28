@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onSnmpWalkProgress: (callback) => ipcRenderer.on(IPC_CHANNELS.SNMP_WALK_PROGRESS, (_event, value) => callback(value)),
   onSnmpWalkComplete: (callback) => ipcRenderer.on(IPC_CHANNELS.SNMP_WALK_COMPLETE, (_event, value) => callback(value)),
   onSnmpWalkError: (callback) => ipcRenderer.on(IPC_CHANNELS.SNMP_WALK_ERROR, (_event, value) => callback(value)),
+  onSnmpIntel: (callback) => ipcRenderer.on(IPC_CHANNELS.SNMP_INTEL, (_event, value) => callback(value)),
 
   // Nmap Triggers
   checkNmap: () => ipcRenderer.invoke(IPC_CHANNELS.CHECK_NMAP),
@@ -134,6 +135,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners(IPC_CHANNELS.SNMP_WALK_PROGRESS);
     ipcRenderer.removeAllListeners(IPC_CHANNELS.SNMP_WALK_COMPLETE);
     ipcRenderer.removeAllListeners(IPC_CHANNELS.SNMP_WALK_ERROR);
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.SNMP_INTEL);
     ipcRenderer.removeAllListeners(IPC_CHANNELS.PCAP_PACKET_SUMMARY);
     ipcRenderer.removeAllListeners(IPC_CHANNELS.PCAP_STATS_UPDATE);
     ipcRenderer.removeAllListeners(IPC_CHANNELS.PCAP_CAPTURE_ERROR);

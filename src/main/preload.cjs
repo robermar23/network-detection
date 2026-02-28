@@ -29,6 +29,7 @@ var IPC_CHANNELS = {
   SNMP_WALK_PROGRESS: "snmp-walk-progress",
   SNMP_WALK_COMPLETE: "snmp-walk-complete",
   SNMP_WALK_ERROR: "snmp-walk-error",
+  SNMP_INTEL: "snmp-intel",
   // Nmap Channels
   CHECK_NMAP: "check-nmap",
   RUN_NMAP_SCAN: "run-nmap-scan",
@@ -118,6 +119,7 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
   onSnmpWalkProgress: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.SNMP_WALK_PROGRESS, (_event, value) => callback(value)),
   onSnmpWalkComplete: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.SNMP_WALK_COMPLETE, (_event, value) => callback(value)),
   onSnmpWalkError: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.SNMP_WALK_ERROR, (_event, value) => callback(value)),
+  onSnmpIntel: (callback) => import_electron.ipcRenderer.on(IPC_CHANNELS.SNMP_INTEL, (_event, value) => callback(value)),
   // Nmap Triggers
   checkNmap: () => import_electron.ipcRenderer.invoke(IPC_CHANNELS.CHECK_NMAP),
   getNmapScripts: () => import_electron.ipcRenderer.invoke(IPC_CHANNELS.GET_NMAP_SCRIPTS),
@@ -211,6 +213,7 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.SNMP_WALK_PROGRESS);
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.SNMP_WALK_COMPLETE);
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.SNMP_WALK_ERROR);
+    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.SNMP_INTEL);
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PCAP_PACKET_SUMMARY);
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PCAP_STATS_UPDATE);
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PCAP_CAPTURE_ERROR);

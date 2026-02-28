@@ -163,7 +163,7 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
   onPassiveStatusUpdate: (cb) => import_electron.ipcRenderer.on(IPC_CHANNELS.PASSIVE_STATUS_UPDATE, (_e, v) => cb(v)),
   onPassiveError: (callback) => {
     import_electron.ipcRenderer.on(IPC_CHANNELS.PASSIVE_DHCP_ERROR, (_event, value) => callback(value));
-    import_electron.ipcRenderer.on(IPC_CHANNELS.PASSIVE_CREDS_ERROR, (_event, value) => callback(value));
+    import_electron.ipcRenderer.on(IPC_CHANNELS.PASSIVE_CRED_ERROR, (_event, value) => callback(value));
     import_electron.ipcRenderer.on(IPC_CHANNELS.PASSIVE_DNS_ERROR, (_event, value) => callback(value));
     import_electron.ipcRenderer.on(IPC_CHANNELS.PASSIVE_ARP_ERROR, (_event, value) => callback(value));
     import_electron.ipcRenderer.on(IPC_CHANNELS.PASSIVE_ROGUE_DNS_ERROR, (_event, value) => callback(value));
@@ -199,7 +199,7 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_ARP_RESULT);
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_ROGUE_DNS_ALERT);
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_DHCP_ERROR);
-    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_CREDS_ERROR);
+    import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_CRED_ERROR);
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_DNS_ERROR);
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_ARP_ERROR);
     import_electron.ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_ROGUE_DNS_ERROR);

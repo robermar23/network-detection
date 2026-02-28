@@ -135,7 +135,6 @@ export function snmpGet(targetIp, oids, options) {
   return new Promise((resolve, reject) => {
     try {
       const session = createSession(targetIp, options);
-      const mappedOids = oids.map(o => o.split('.').map(Number)); // net-snmp needs int arrays if possible, or str is fine
       
       session.get(oids, (error, varbinds) => {
         session.close();

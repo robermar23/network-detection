@@ -1229,7 +1229,7 @@ function openDetailsPanel(host) {
       vHeader.textContent = `${v.id} (${v.severity.toUpperCase()})`;
       const vBody = document.createElement('div');
       vBody.style.cssText = 'color: var(--text-muted); line-height: 1.4; white-space: pre-wrap; word-break: break-all;';
-      vBody.innerHTML = v.details;
+      vBody.textContent = v.details;
       
       vDiv.appendChild(vHeader);
       vDiv.appendChild(vBody);
@@ -2994,7 +2994,25 @@ if (window.electronAPI) {
 
     const banner = document.createElement('div');
     banner.className = 'ds-banner selectable-text';
-    banner.innerHTML = `<div>Query: <strong>${alertMsg.domain}</strong></div><div>Answer: <strong>${alertMsg.resolvedIp}</strong></div><div style="margin-top:4px;font-size:10px;color:rgba(255,255,255,0.5)">${alertMsg.timestamp}</div>`;
+    const queryDiv = document.createElement('div');
+    queryDiv.textContent = 'Query: ';
+    const queryStrong = document.createElement('strong');
+    queryStrong.textContent = alertMsg.domain;
+    queryDiv.appendChild(queryStrong);
+    
+    const answerDiv = document.createElement('div');
+    answerDiv.textContent = 'Answer: ';
+    const answerStrong = document.createElement('strong');
+    answerStrong.textContent = alertMsg.resolvedIp;
+    answerDiv.appendChild(answerStrong);
+    
+    const timeDiv = document.createElement('div');
+    timeDiv.style.cssText = 'margin-top:4px;font-size:10px;color:rgba(255,255,255,0.5)';
+    timeDiv.textContent = alertMsg.timestamp;
+    
+    banner.appendChild(queryDiv);
+    banner.appendChild(answerDiv);
+    banner.appendChild(timeDiv);
 
     card.appendChild(title);
     card.appendChild(banner);
@@ -3025,14 +3043,38 @@ if (window.electronAPI) {
     if (!livePcapResults) return;
 
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td style="white-space:nowrap">${new Date(summary.timestamp).toLocaleTimeString()}</td>
-      <td class="selectable-text">${summary.srcIp}</td>
-      <td class="selectable-text">${summary.dstIp}</td>
-      <td><span class="badge ${summary.protocol === 'TCP' ? 'info' : (summary.protocol === 'UDP' ? 'success' : 'warning')}">${summary.protocol}</span></td>
-      <td>${summary.length}</td>
-      <td class="selectable-text text-ellipsis" title="${summary.info.replace(/"/g, '&quot;')}">${summary.info}</td>
-    `;
+    const tdTime = document.createElement('td');
+    tdTime.style.whiteSpace = 'nowrap';
+    tdTime.textContent = new Date(summary.timestamp).toLocaleTimeString();
+    
+    const tdSrc = document.createElement('td');
+    tdSrc.className = 'selectable-text';
+    tdSrc.textContent = summary.srcIp;
+    
+    const tdDst = document.createElement('td');
+    tdDst.className = 'selectable-text';
+    tdDst.textContent = summary.dstIp;
+    
+    const tdProto = document.createElement('td');
+    const spanProto = document.createElement('span');
+    spanProto.className = 'badge ' + (summary.protocol === 'TCP' ? 'info' : (summary.protocol === 'UDP' ? 'success' : 'warning'));
+    spanProto.textContent = summary.protocol;
+    tdProto.appendChild(spanProto);
+    
+    const tdLen = document.createElement('td');
+    tdLen.textContent = summary.length;
+    
+    const tdInfo = document.createElement('td');
+    tdInfo.className = 'selectable-text text-ellipsis';
+    tdInfo.title = summary.info;
+    tdInfo.textContent = summary.info;
+    
+    tr.appendChild(tdTime);
+    tr.appendChild(tdSrc);
+    tr.appendChild(tdDst);
+    tr.appendChild(tdProto);
+    tr.appendChild(tdLen);
+    tr.appendChild(tdInfo);
     
     if (livePcapResults.children[0] && livePcapResults.children[0].textContent.includes('Waiting for')) {
       livePcapResults.innerHTML = '';
@@ -3187,7 +3229,7 @@ initPassivePanel();
 // --- Global SNMP Listeners ---
 window.electronAPI.onSnmpWalkProgress && window.electronAPI.onSnmpWalkProgress((progress) => {
   const pCount = document.getElementById('snmp-progress-count');
-  if (pCount) pCount.textContent = `${progress.oidsProcessed} OIDs`;
+  if (pCount) pCount.textContent = `${progress.count} OIDs`;
 });
 
 window.electronAPI.onSnmpWalkResult && window.electronAPI.onSnmpWalkResult((result) => {
@@ -3229,6 +3271,12 @@ window.electronAPI.onSnmpWalkResult && window.electronAPI.onSnmpWalkResult((resu
 
 window.electronAPI.onSnmpWalkComplete && window.electronAPI.onSnmpWalkComplete((hostIp) => {
   const btnRunSnmp = document.getElementById('btn-run-snmp');
+  if (btnRunSnmp) {
+    btnRunSnmp.innerHTML = `<span class="icon">📡</span> SNMP Walk`;
+    btnRunSnmp.setAttribute('data-scanning', 'false');
+    btnRunSnmp.classList.remove('pulsing', 'danger-pulsing');
+    btnRunSnmp.classList.add('info');
+  }
 
   const pContainer = document.getElementById('snmp-progress-container');
   if (pContainer) pContainer.style.display = 'none';

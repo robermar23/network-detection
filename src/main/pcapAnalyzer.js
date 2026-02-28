@@ -145,8 +145,8 @@ export function startLiveCapture(interfaceId, hostIp, options, onPacketSummary, 
     // Prevent "host host 192.168.1.5" syntax errors if user manually typed "host"
     const filterPrefix = hostIp.trim().toLowerCase().startsWith('host') ? '' : 'host ';
     args.push('-f', `${filterPrefix}${hostIp.trim()}`);
-  } else if (options.bpfFilter) {
-    args.push('-f', options.bpfFilter);
+  } else if (options.bpf) {
+    args.push('-f', options.bpf);
   }
 
   try {
@@ -225,7 +225,8 @@ export async function analyzePcapFile(filePath, onPacketSummary, onStats, onErro
       '-T', 'ek'
     ];
     
-    const analysisProcess = spawn('tshark', args);
+    const tsharkPath = getSetting('tshark.path') || 'tshark';
+    const analysisProcess = spawn(tsharkPath, args);
     
     const rl = readline.createInterface({
       input: analysisProcess.stdout,

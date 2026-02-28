@@ -84,7 +84,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onPassiveStatusUpdate: (cb) => ipcRenderer.on(IPC_CHANNELS.PASSIVE_STATUS_UPDATE, (_e, v) => cb(v)),
   onPassiveError: (callback) => {
     ipcRenderer.on(IPC_CHANNELS.PASSIVE_DHCP_ERROR, (_event, value) => callback(value));
-    ipcRenderer.on(IPC_CHANNELS.PASSIVE_CREDS_ERROR, (_event, value) => callback(value));
+    ipcRenderer.on(IPC_CHANNELS.PASSIVE_CRED_ERROR, (_event, value) => callback(value));
     ipcRenderer.on(IPC_CHANNELS.PASSIVE_DNS_ERROR, (_event, value) => callback(value));
     ipcRenderer.on(IPC_CHANNELS.PASSIVE_ARP_ERROR, (_event, value) => callback(value));
     ipcRenderer.on(IPC_CHANNELS.PASSIVE_ROGUE_DNS_ERROR, (_event, value) => callback(value));
@@ -122,7 +122,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_ARP_RESULT);
     ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_ROGUE_DNS_ALERT);
     ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_DHCP_ERROR);
-    ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_CREDS_ERROR);
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_CRED_ERROR);
     ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_DNS_ERROR);
     ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_ARP_ERROR);
     ipcRenderer.removeAllListeners(IPC_CHANNELS.PASSIVE_ROGUE_DNS_ERROR);

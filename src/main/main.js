@@ -24,7 +24,7 @@ import { runDeepScan, cancelDeepScan } from './deepScanner.js';
 import { checkNmapInstalled, runNmapScan, cancelNmapScan, runNcat, getNmapScripts } from './nmapScanner.js';
 import { createMainWindow } from './windowManager.js';
 import { parseNmapXml } from './nmapXmlParser.js';
-import { snmpWalk, snmpGet, cancelSnmpWalk } from './snmpWalker.js';
+import { registerSnmpHandlers } from './snmpIpc.js';
 import ping from 'ping';
 import { getSetting, setSetting, getAllSettings, checkDependency } from './store.js';
 import { startTsharkCapture, stopTsharkCapture } from './tsharkScanner.js';
@@ -50,6 +50,7 @@ function createWindow() {
     (p) => path.join(__dirname, p), 
     'http://localhost:5173'
   );
+  registerSnmpHandlers(ipcMain, mainWindow);
 }
 
 app.whenReady().then(() => {
@@ -138,40 +139,7 @@ ipcMain.handle(IPC_CHANNELS.CHECK_NMAP, async () => {
   return await checkNmapInstalled();
 });
 
-// --- SNMP Walking ---
-
-ipcMain.handle(IPC_CHANNELS.SNMP_WALK, async (event, { targetIp, options }) => {
-  console.log(`SNMP Walk requested for ${targetIp}`);
-  const success = snmpWalk(targetIp, options,
-    (resultData) => {
-      if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.SNMP_WALK_RESULT, resultData);
-    },
-    (progressData) => {
-      if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.SNMP_WALK_PROGRESS, progressData);
-    },
-    (completeData) => {
-      if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.SNMP_WALK_COMPLETE, completeData);
-    },
-    (errorData) => {
-      if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.SNMP_WALK_ERROR, errorData);
-    }
-  );
-  return { status: success ? 'started' : 'failed' };
-});
-
-ipcMain.handle(IPC_CHANNELS.SNMP_GET, async (event, { targetIp, oids, options }) => {
-  try {
-    const results = await snmpGet(targetIp, oids, options);
-    return { success: true, results };
-  } catch (err) {
-    return { success: false, error: err.message };
-  }
-});
-
-ipcMain.handle(IPC_CHANNELS.CANCEL_SNMP_WALK, async (event, targetIp) => {
-  const success = cancelSnmpWalk(targetIp);
-  return { status: success ? 'cancelled' : 'not_found' };
-});
+// SNMP Handlers registered via snmpIpc.js
 
 // --- Settings Management ---
 
@@ -315,21 +283,71 @@ ipcMain.handle(IPC_CHANNELS.STOP_TSHARK, async () => {
 
 // --- Passive Network Intelligence ---
 
+function wirePcapLiveCapture(interfaceId, hostIp, options) {
+  startLiveCapture(
+    interfaceId,
+    hostIp ?? options?.host,
+    options,
+    (summary) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_PACKET_SUMMARY, summary),
+    (stats)   => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_STATS_UPDATE, stats),
+    (err)     => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_CAPTURE_ERROR, err),
+    (msg)     => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_CAPTURE_COMPLETE, msg)
+  );
+}
+
+const passiveStartHandlers = {
+  dhcp: (iface, options, onError, onComplete) =>
+    startDhcpDetection(iface,
+      (alert) => mainWindow?.webContents.send(IPC_CHANNELS.PASSIVE_DHCP_ALERT, alert),
+      onError, onComplete),
+  creds: (iface, options, onError, onComplete) =>
+    startCredentialSniffing(iface,
+      (cred) => mainWindow?.webContents.send(IPC_CHANNELS.PASSIVE_CRED_FOUND, cred),
+      onError, onComplete),
+  dns: (iface, options, onError, onComplete) =>
+    startDnsHarvesting(iface,
+      (host) => mainWindow?.webContents.send(IPC_CHANNELS.PASSIVE_DNS_HOST, host),
+      onError, onComplete),
+  arp: (iface, options, onError, onComplete) =>
+    startArpDetection(iface,
+      (alert) => mainWindow?.webContents.send(IPC_CHANNELS.PASSIVE_ARP_ALERT, alert),
+      onError, onComplete),
+  'rogue-dns': (iface, options, onError, onComplete) =>
+    startRogueDnsDetection(iface,
+      (alert) => mainWindow?.webContents.send(IPC_CHANNELS.PASSIVE_ROGUE_DNS_ALERT, alert),
+      onError, onComplete),
+  pcap: (iface, options, onError, onComplete) => {
+    wirePcapLiveCapture(iface, options?.host, options);
+    onComplete?.({ moduleId: 'pcap' });
+    return true;
+  }
+};
+
+const passiveStopHandlers = {
+  dhcp: () => stopDhcpDetection(),
+  creds: () => stopCredentialSniffing(),
+  dns: () => stopDnsHarvesting(),
+  arp: () => stopArpDetection(),
+  'rogue-dns': () => stopRogueDnsDetection(),
+  pcap: () => { stopLiveCapture(); return true; }
+};
+
 ipcMain.handle(IPC_CHANNELS.START_PASSIVE_CAPTURE, async (event, { moduleId, interfaceId, options }) => {
   console.log(`Starting passive capture module: ${moduleId} on ${interfaceId}`);
-  
-  let success = false;
-  
+
+  const channelMap = {
+    dhcp:       IPC_CHANNELS.PASSIVE_DHCP_ERROR,
+    creds:      IPC_CHANNELS.PASSIVE_CRED_ERROR,
+    dns:        IPC_CHANNELS.PASSIVE_DNS_ERROR,
+    arp:        IPC_CHANNELS.PASSIVE_ARP_ERROR,
+    'rogue-dns': IPC_CHANNELS.PASSIVE_ROGUE_DNS_ERROR,
+    pcap:       IPC_CHANNELS.PCAP_CAPTURE_ERROR,
+  };
+
   const onError = (errorMsg) => {
-    const channelMap = {
-      'dhcp': IPC_CHANNELS.PASSIVE_DHCP_ERROR,
-      'creds': IPC_CHANNELS.PASSIVE_CRED_ERROR,
-      'dns': IPC_CHANNELS.PASSIVE_DNS_ERROR,
-      'arp': IPC_CHANNELS.PASSIVE_ARP_ERROR,
-      'rogue-dns': IPC_CHANNELS.PASSIVE_ROGUE_DNS_ERROR
-    };
-    if (mainWindow && channelMap[moduleId]) {
-      mainWindow.webContents.send(channelMap[moduleId], errorMsg);
+    const channel = channelMap[moduleId];
+    if (mainWindow && channel) {
+      mainWindow.webContents.send(channel, errorMsg);
     }
   };
 
@@ -337,57 +355,16 @@ ipcMain.handle(IPC_CHANNELS.START_PASSIVE_CAPTURE, async (event, { moduleId, int
     if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.PASSIVE_CAPTURE_COMPLETE, data);
   };
 
-  if (moduleId === 'dhcp') {
-    success = startDhcpDetection(interfaceId, 
-      (alert) => mainWindow?.webContents.send(IPC_CHANNELS.PASSIVE_DHCP_ALERT, alert),
-      onError, onComplete
-    );
-  } else if (moduleId === 'creds') {
-    success = startCredentialSniffing(interfaceId,
-      (cred) => mainWindow?.webContents.send(IPC_CHANNELS.PASSIVE_CRED_FOUND, cred),
-      onError, onComplete
-    );
-  } else if (moduleId === 'dns') {
-    success = startDnsHarvesting(interfaceId,
-      (host) => mainWindow?.webContents.send(IPC_CHANNELS.PASSIVE_DNS_HOST, host),
-      onError, onComplete
-    );
-  } else if (moduleId === 'arp') {
-    success = startArpDetection(interfaceId,
-      (alert) => mainWindow?.webContents.send(IPC_CHANNELS.PASSIVE_ARP_ALERT, alert),
-      onError, onComplete
-    );
-  } else if (moduleId === 'rogue-dns') {
-    success = startRogueDnsDetection(interfaceId,
-      (alert) => mainWindow?.webContents.send(IPC_CHANNELS.PASSIVE_ROGUE_DNS_ALERT, alert),
-      onError, onComplete
-    );
-  } else if (moduleId === 'pcap') {
-    startLiveCapture(interfaceId, options?.host, options,
-      (summary) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_PACKET_SUMMARY, summary),
-      (stats) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_STATS_UPDATE, stats),
-      onError,
-      (msg) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_CAPTURE_COMPLETE, msg)
-    );
-    success = true; // startLiveCapture handles its own async process and errors
-  }
+  const startHandler = passiveStartHandlers[moduleId];
+  const success = startHandler ? !!startHandler(interfaceId, options, onError, onComplete) : false;
 
   return { status: success ? 'started' : 'failed' };
 });
 
 ipcMain.handle(IPC_CHANNELS.STOP_PASSIVE_CAPTURE, async (event, moduleId) => {
   console.log(`Stopping passive capture module: ${moduleId}`);
-  let stopped = false;
-  if (moduleId === 'dhcp') stopped = stopDhcpDetection();
-  else if (moduleId === 'creds') stopped = stopCredentialSniffing();
-  else if (moduleId === 'dns') stopped = stopDnsHarvesting();
-  else if (moduleId === 'arp') stopped = stopArpDetection();
-  else if (moduleId === 'rogue-dns') stopped = stopRogueDnsDetection();
-  else if (moduleId === 'pcap') {
-    stopLiveCapture();
-    stopped = true;
-  }
-  
+  const stopHandler = passiveStopHandlers[moduleId];
+  const stopped = stopHandler ? !!stopHandler() : false;
   return { status: stopped ? 'stopped' : 'not_running' };
 });
 
@@ -413,12 +390,7 @@ ipcMain.handle(IPC_CHANNELS.EXPORT_PCAP, async (event, { interfaceId, hostIp, du
 
 ipcMain.handle(IPC_CHANNELS.START_PCAP_CAPTURE, async (event, { interfaceId, hostIp, options }) => {
   console.log(`Starting PCAP live capture on ${interfaceId} for ${hostIp || 'all'}`);
-  startLiveCapture(interfaceId, hostIp, options,
-    (summary) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_PACKET_SUMMARY, summary),
-    (stats) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_STATS_UPDATE, stats),
-    (err) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_CAPTURE_ERROR, err),
-    (msg) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_CAPTURE_COMPLETE, msg)
-  );
+  wirePcapLiveCapture(interfaceId, hostIp, options);
   return { status: 'started' };
 });
 

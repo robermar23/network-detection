@@ -102,56 +102,7 @@ export function snmpWalk(targetIp, options, onResult, onProgress, onComplete, on
 
         // --- SNMP Intelligence Extraction ---
         if (onIntelligence) {
-          if (oid === '1.3.6.1.2.1.1.1.0') { // sysDescr
-            let osVal = val;
-            let vendorVal = '';
-            
-            // Windows typically formats sysDescr as "Hardware: <hw> - Software: <os>"
-            if (val.includes('Hardware:') && val.includes('Software:')) {
-              const parts = val.split(' - Software: ');
-              vendorVal = parts[0].replace('Hardware: ', '').trim();
-              if (parts.length > 1) {
-                osVal = parts[1].trim();
-              }
-            }
-            
-            onIntelligence({ type: 'os', targetIp, value: osVal });
-            if (vendorVal) {
-              onIntelligence({ type: 'vendor', targetIp, value: vendorVal });
-            }
-          } else if (oid === '1.3.6.1.2.1.1.5.0') { // sysName
-            onIntelligence({ type: 'hostname', targetIp, value: val });
-          } else if (oid.startsWith('1.3.6.1.2.1.4.22.1.2.') || oid.startsWith('1.3.6.1.2.1.3.1.1.2.')) { 
-            // ipNetToMediaPhysAddress (Standard) or atPhysAddress (Legacy/Windows)
-            const ipParts = oid.split('.');
-            let discoveredIp = '';
-            // Make sure we extract the valid IPv4 even if the interface ID format varies
-            if (ipParts.length >= 4) {
-               discoveredIp = ipParts.slice(-4).join('.');
-            }
-            console.log(`[SNMP Walker] Found ARP root ${oid}, extracted IP: ${discoveredIp}, raw MAC: ${val}`);
-            if (discoveredIp && val && !val.includes('00:00:00:00:00:00') && !val.includes('ff:ff:ff:ff:ff:ff')) {
-               console.log(`[SNMP Walker] Emitting arp-discovery for ${discoveredIp} (${val})`);
-               onIntelligence({ type: 'arp-discovery', targetIp, discoveredIp, discoveredMac: val });
-            } else {
-               console.log(`[SNMP Walker] Discarded arp-discovery for ${discoveredIp} because it was dummy or empty.`);
-            }
-          } else if (oid.startsWith('1.3.6.1.2.1.25.4.2.1.2.')) {
-            // hrSWRunName (Running Processes)
-            if (val && typeof val === 'string' && val.trim().length > 0) {
-               onIntelligence({ type: 'process-discovery', targetIp, processName: val.trim() });
-            }
-          } else if (oid.startsWith('1.3.6.1.2.1.4.21.1.1.')) {
-            // ipRouteDest (Routing Table IPv4 Destinations)
-            const ipParts = oid.split('.');
-            let destIp = '';
-            if (ipParts.length >= 4) {
-               destIp = ipParts.slice(-4).join('.');
-            }
-            if (destIp && destIp !== '0.0.0.0' && destIp !== '127.0.0.0' && destIp !== '127.0.0.1') {
-               onIntelligence({ type: 'route-discovery', targetIp, routeIp: destIp });
-            }
-          }
+          extractIntelligence({ oid, val, targetIp, onIntelligence });
         }
 
         if (onResult) {
@@ -181,6 +132,62 @@ export function snmpWalk(targetIp, options, onResult, onProgress, onComplete, on
     activeWalks.delete(targetIp);
     if (onError) onError({ targetIp, error: err.message });
     return false;
+  }
+}
+
+/**
+ * --- Intelligence Helpers ---
+ */
+
+function parseSysDescr(val) {
+  let osVal = val;
+  let vendorVal = '';
+
+  if (val.includes('Hardware:') && val.includes('Software:')) {
+    const parts = val.split(' - Software: ');
+    vendorVal = parts[0].replace('Hardware: ', '').trim();
+    if (parts.length > 1) {
+      osVal = parts[1].trim();
+    }
+  }
+
+  return { os: osVal, vendor: vendorVal };
+}
+
+function oidToIPv4(oid) {
+  const parts = oid.split('.');
+  if (parts.length < 4) return '';
+  return parts.slice(-4).join('.');
+}
+
+function extractIntelligence({ oid, val, targetIp, onIntelligence }) {
+  if (!onIntelligence) return;
+
+  if (oid === '1.3.6.1.2.1.1.1.0') { // sysDescr
+    const { os, vendor } = parseSysDescr(val);
+    onIntelligence({ type: 'os', targetIp, value: os });
+    if (vendor) {
+      onIntelligence({ type: 'vendor', targetIp, value: vendor });
+    }
+  } else if (oid === '1.3.6.1.2.1.1.5.0') { // sysName
+    onIntelligence({ type: 'hostname', targetIp, value: val });
+  } else if (oid.startsWith('1.3.6.1.2.1.4.22.1.2.') || oid.startsWith('1.3.6.1.2.1.3.1.1.2.')) { 
+    // ipNetToMediaPhysAddress (Standard) or atPhysAddress (Legacy/Windows)
+    const discoveredIp = oidToIPv4(oid);
+    if (discoveredIp && val && !val.includes('00:00:00:00:00:00') && !val.includes('ff:ff:ff:ff:ff:ff')) {
+       onIntelligence({ type: 'arp-discovery', targetIp, discoveredIp, discoveredMac: val });
+    }
+  } else if (oid.startsWith('1.3.6.1.2.1.25.4.2.1.2.')) {
+    // hrSWRunName (Running Processes)
+    if (val && typeof val === 'string' && val.trim().length > 0) {
+       onIntelligence({ type: 'process-discovery', targetIp, processName: val.trim() });
+    }
+  } else if (oid.startsWith('1.3.6.1.2.1.4.21.1.1.')) {
+    // ipRouteDest (Routing Table IPv4 Destinations)
+    const destIp = oidToIPv4(oid);
+    if (destIp && !['0.0.0.0', '127.0.0.0', '127.0.0.1'].includes(destIp)) {
+       onIntelligence({ type: 'route-discovery', targetIp, routeIp: destIp });
+    }
   }
 }
 

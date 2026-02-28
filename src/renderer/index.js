@@ -1458,6 +1458,7 @@ function attachDetailsPanelListeners(host) {
 
   if (btnRunSnmp) {
     btnRunSnmp.addEventListener('click', async () => {
+      await refreshSnmpBlacklist();
       if (btnRunSnmp.getAttribute('data-scanning') === 'true') {
         api.cancelSnmpWalk(host.ip);
         btnRunSnmp.innerHTML = `<span class="icon">🛑</span> Cancelling...`;
@@ -1506,14 +1507,15 @@ function attachDetailsPanelListeners(host) {
     btnExportSnmp.onclick = () => {
        if (!window.currentSnmpWalkData || window.currentSnmpWalkData.length === 0) return;
        
-       let csvContent = "data:text/csv;charset=utf-8,OID,Name,Type,Value\n";
+       let csvContent = "OID,Name,Type,Value\n";
        window.currentSnmpWalkData.forEach(row => {
           const cleanValue = String(row.value).replace(/"/g, '""'); // Escape CSV quotes
           const typeMap = { 2: 'Integer', 4: 'OctetString', 5: 'Null', 6: 'OID', 64: 'IpAddress', 65: 'Counter', 66: 'Gauge', 67: 'TimeTicks', 68: 'Opaque' };
           const typeStr = typeMap[row.type] || `Type ${row.type}`;
           csvContent += `"${row.oid}","${row.name || ''}","${typeStr}","${cleanValue}"\n`;
        });
-       const encodedUri = "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent.replace("data:text/csv;charset=utf-8,", ""));
+       
+       const encodedUri = "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent);
        const link = document.createElement("a");
        link.setAttribute("href", encodedUri);
        link.setAttribute("download", `snmp_walk_${host.ip}_${new Date().getTime()}.csv`);
@@ -3304,115 +3306,128 @@ function initPassivePanel() {
 
 initPassivePanel();
 
+// --- SNMP UI Helpers ---
+let cachedSnmpBlacklist = [];
+
+async function refreshSnmpBlacklist() {
+  const blacklistStr = await window.electronAPI.settings.get('blacklist');
+  cachedSnmpBlacklist = blacklistStr ? blacklistStr.split(',').map(s=>s.trim()) : [];
+}
+
+function addDiscoveredHost({ ip, mac, source }) {
+  // Re-check for existing host to avoid race duplicates
+  const existingIdx = state.hosts.findIndex(h => h.ip === ip);
+  if (existingIdx !== -1) {
+     // If the host exists but lacks a MAC address, silently enrich it
+     if (state.hosts[existingIdx].mac === 'Unknown' && mac) {
+        state.hosts[existingIdx].mac = mac;
+        console.log(`[SNMP Intel] Enriched existing host MAC via ARP: ${ip}`);
+        debouncedRenderAllHosts();
+     }
+     return;
+  }
+
+  // Blacklist check (using cached list for performance)
+  if (cachedSnmpBlacklist.includes(ip) || ip === '127.0.0.1' || ip === '0.0.0.0') {
+    return;
+  }
+
+  state.hosts.push({
+    ip,
+    mac: mac || 'Unknown',
+    hostname: 'Unknown',
+    vendor: 'Unknown',
+    os: 'Unknown',
+    status: 'online',
+    ports: [],
+    vulnerabilities: [],
+    routing: [],
+    processes: [],
+    source: source || 'snmp-arp'
+  });
+  console.log(`[SNMP Intel] Auto-discovered new host via ARP: ${ip}`);
+  debouncedRenderAllHosts();
+}
+
+function renderIntelligenceBadge(containerId, value, type) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const sectionId = containerId.replace('-container', '-section');
+  const section = document.getElementById(sectionId);
+  if (section) section.style.display = 'block';
+
+  const sp = document.createElement('span');
+  sp.className = 'port-item';
+  if (type === 'route') {
+    sp.style.background = 'var(--info)';
+    sp.style.color = '#fff';
+  } else {
+    sp.style.background = 'rgba(255,255,255,0.1)';
+    sp.style.border = '1px solid var(--border-glass)';
+  }
+  sp.textContent = value;
+  container.appendChild(sp);
+}
+
+function updateHostIntelligence(ip, intel) {
+  const hostIdx = state.hosts.findIndex(h => h.ip === ip);
+  if (hostIdx === -1) return;
+
+  let changed = false;
+  const host = state.hosts[hostIdx];
+
+  // Map incoming intelligence types to state update logic
+  if (intel.type === 'os' && intel.value && host.os !== intel.value) {
+    host.os = intel.value;
+    changed = true;
+  } else if (intel.type === 'hostname' && intel.value && host.hostname !== intel.value) {
+    host.hostname = intel.value;
+    changed = true;
+  } else if (intel.type === 'vendor' && intel.value && host.vendor !== intel.value) {
+    host.vendor = intel.value;
+    changed = true;
+  } else if (intel.type === 'process-discovery' && intel.processName) {
+    if (!host.processes) host.processes = [];
+    if (!host.processes.includes(intel.processName)) {
+      host.processes.push(intel.processName);
+      changed = true;
+    }
+  } else if (intel.type === 'route-discovery' && intel.routeIp) {
+    if (!host.routing) host.routing = [];
+    if (!host.routing.includes(intel.routeIp)) {
+      host.routing.push(intel.routeIp);
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    debouncedRenderAllHosts();
+    
+    // Live update open panel if it matches the current host
+    const btnRunDeepScan = document.getElementById('btn-run-deep-scan');
+    if (btnRunDeepScan && btnRunDeepScan.getAttribute('data-ip') === ip) {
+      if (intel.type === 'os') {
+        const el = document.getElementById('dp-os');
+        if (el) el.innerText = intel.value;
+      } else if (intel.type === 'hostname') {
+        const el = document.getElementById('dp-hostname');
+        if (el) el.innerText = intel.value;
+      } else if (intel.type === 'process-discovery') {
+        renderIntelligenceBadge('dp-processes-container', intel.processName, 'process');
+      } else if (intel.type === 'route-discovery') {
+        renderIntelligenceBadge('dp-routing-container', intel.routeIp, 'route');
+      }
+    }
+  }
+}
+
 // --- Global SNMP Listeners ---
 window.electronAPI.onSnmpIntel && window.electronAPI.onSnmpIntel((intel) => {
   if (intel.type === 'arp-discovery' && intel.discoveredIp) {
-    console.log('[UI SNMP Intel] Received ARP payload:', intel.discoveredIp, intel.discoveredMac);
-    const existingIdx = state.hosts.findIndex(h => h.ip === intel.discoveredIp);
-    if (existingIdx === -1) {
-      window.electronAPI.settings.get('blacklist').then(blacklistStr => {
-         const blacklist = blacklistStr ? blacklistStr.split(',').map(s=>s.trim()) : [];
-         if (!blacklist.includes(intel.discoveredIp) && intel.discoveredIp !== '127.0.0.1' && intel.discoveredIp !== '0.0.0.0') {
-            state.hosts.push({
-              ip: intel.discoveredIp,
-              mac: intel.discoveredMac || 'Unknown',
-              hostname: 'Unknown',
-              vendor: 'Unknown',
-              os: 'Unknown',
-              status: 'online', // we know it's online because it's in an active ARP cache
-              ports: [],
-              vulnerabilities: [],
-              routing: [],
-              processes: [],
-              source: 'snmp-arp'
-            });
-            console.log(`[SNMP Intel] Auto-discovered new host via ARP: ${intel.discoveredIp}`);
-            debouncedRenderAllHosts();
-         }
-      });
-    } else {
-      // If the host exists but lacks a MAC address, silently enrich it
-      if (state.hosts[existingIdx].mac === 'Unknown' && intel.discoveredMac) {
-         state.hosts[existingIdx].mac = intel.discoveredMac;
-         console.log(`[SNMP Intel] Enriched existing host MAC via ARP: ${intel.discoveredIp}`);
-         debouncedRenderAllHosts();
-      }
-    }
-    return; // Stop processing since this was an ARP payload
-  }
-
-  // Standard OS/Vendor/Hostname intelligence matching
-  const hostIdx = state.hosts.findIndex(h => h.ip === intel.targetIp);
-  if (hostIdx >= 0) {
-    let changed = false;
-    
-    if (intel.type === 'os' && intel.value) {
-      if (state.hosts[hostIdx].os !== intel.value) {
-         state.hosts[hostIdx].os = intel.value;
-         changed = true;
-      }
-    } else if (intel.type === 'hostname' && intel.value) {
-      if (state.hosts[hostIdx].hostname !== intel.value) {
-         state.hosts[hostIdx].hostname = intel.value;
-         changed = true;
-      }
-    } else if (intel.type === 'vendor' && intel.value) {
-      if (state.hosts[hostIdx].vendor !== intel.value) {
-         state.hosts[hostIdx].vendor = intel.value;
-         changed = true;
-      }
-    } else if (intel.type === 'process-discovery' && intel.processName) {
-      if (!state.hosts[hostIdx].processes) state.hosts[hostIdx].processes = [];
-      if (!state.hosts[hostIdx].processes.includes(intel.processName)) {
-         state.hosts[hostIdx].processes.push(intel.processName);
-         changed = true;
-      }
-    } else if (intel.type === 'route-discovery' && intel.routeIp) {
-      if (!state.hosts[hostIdx].routing) state.hosts[hostIdx].routing = [];
-      if (!state.hosts[hostIdx].routing.includes(intel.routeIp)) {
-         state.hosts[hostIdx].routing.push(intel.routeIp);
-         changed = true;
-      }
-    }
-    
-    if (changed) {
-       // Silently update the core data, and ping the debouncer to redraw the host grid
-       debouncedRenderAllHosts();
-
-       // If the Host Details panel is currently open for THIS host, live-update the text DOM
-       const btnRunDeepScan = document.getElementById('btn-run-deep-scan');
-       if (btnRunDeepScan && btnRunDeepScan.getAttribute('data-ip') === intel.targetIp) {
-         if (intel.type === 'os') {
-            const elOs = document.getElementById('dp-os');
-            if (elOs) elOs.innerText = intel.value;
-         } else if (intel.type === 'hostname') {
-            const elHostname = document.getElementById('dp-hostname');
-            if (elHostname) elHostname.innerText = intel.value;
-         } else if (intel.type === 'process-discovery') {
-            document.getElementById('dp-processes-section').style.display = 'block';
-            const pContainer = document.getElementById('dp-processes-container');
-            if (pContainer) {
-               const sp = document.createElement('span');
-               sp.className = 'port-item';
-               sp.style.background = 'rgba(255,255,255,0.1)';
-               sp.style.border = '1px solid var(--border-glass)';
-               sp.textContent = intel.processName;
-               pContainer.appendChild(sp);
-            }
-         } else if (intel.type === 'route-discovery') {
-            document.getElementById('dp-routing-section').style.display = 'block';
-            const rContainer = document.getElementById('dp-routing-container');
-            if (rContainer) {
-               const sp = document.createElement('span');
-               sp.className = 'port-item';
-               sp.style.background = 'var(--info)';
-               sp.style.color = '#fff';
-               sp.textContent = intel.routeIp;
-               rContainer.appendChild(sp);
-            }
-         }
-       }
-    }
+    addDiscoveredHost({ ip: intel.discoveredIp, mac: intel.discoveredMac });
+  } else {
+    updateHostIntelligence(intel.targetIp, intel);
   }
 });
 

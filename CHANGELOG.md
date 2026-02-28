@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.9.0](https://github.com/robermar23/netspectre/compare/v1.8.1...v1.9.0) (2026-02-28)
+
+
+### Features
+
+* **core:** implement SNMP walking, interactive topology map, and rog… ([93e3349](https://github.com/robermar23/netspectre/commit/93e3349282e2d7bfc30a154f601977dd5f53b526))
+* **core:** implement SNMP walking, interactive topology map, and rogue DNS ([11681ba](https://github.com/robermar23/netspectre/commit/11681ba9728ba5246f6e17974c8596ddbab90e60))
+
+
+### Bug Fixes
+
+* enhanced images ([39b3fe5](https://github.com/robermar23/netspectre/commit/39b3fe52e60c9ac3daf7710ecc9db9aab158310b))
+* snmp walk output format ([9eb6a11](https://github.com/robermar23/netspectre/commit/9eb6a1144782448a3b44304ec37666261e7745b7))
+
 ## [1.8.1](https://github.com/robermar23/netspectre/compare/v1.8.0...v1.8.1) (2026-02-27)
 
 

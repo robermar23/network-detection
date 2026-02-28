@@ -123,10 +123,12 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
+    "cytoscape": "^3.33.1",
     "electron-store": "^11.0.2",
     "electron-updater": "^6.8.3",
     "fast-xml-parser": "^5.3.7",
     "local-network-scanner": "^0.2.0",
+    "net-snmp": "^3.26.1",
     "ping": "^1.0.0",
     "split2": "^4.2.0"
   }

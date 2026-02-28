@@ -21,10 +21,10 @@ As a modern Electron/Node.js application, NetSpecter can leverage advanced web t
 Deepening the application's understanding of Layer 2 and Layer 3 topologies to provide holistic network visibility.
 
 COMPLETED   **VLAN Hopping & Tag Detection:** Detect misconfigured trunk ports and attempt to identify 802.1Q VLAN tags traversing the wire.
-*   **SNMP Walking & MIB Parsing:** Full integration for SNMPv1/v2c/v3. Automatically walk target devices to pull routing tables, interface statistics, and exact hardware firmware versions.
-*   **Topology Mapping (Graph View):** Transform the flat list dashboard into an interactive visual topology map (using D3.js or Cytoscape) showing routers, switches, endpoints, and their logical subnets.
-*   **PCAP Packet Capture & Analysis:** Integrate `libpcap` bindings. Allow users to right-click a host and run a live 60-second Wireshark-like packet capture to detect cleartext credentials or anomalous traffic.
-*   **Rogue DHCP/DNS Detection:** Actively listen for and flag rogue DHCP servers handing out incorrect IP ranges or unauthorized DNS servers performing spoofing.
+COMPLETED   **SNMP Walking & MIB Parsing:** Full integration for SNMPv1/v2c/v3. Automatically walk target devices to pull routing tables, interface statistics, and exact hardware firmware versions.
+COMPLETED   **Topology Mapping (Graph View):** Transform the flat list dashboard into an interactive visual topology map (using D3.js or Cytoscape) showing routers, switches, endpoints, and their logical subnets.
+COMPLETED   **PCAP Packet Capture & Analysis:** Integrate `libpcap` bindings. Allow users to right-click a host and run a live 60-second Wireshark-like packet capture to detect cleartext credentials or anomalous traffic.
+COMPLETED   **Rogue DHCP/DNS Detection:** Actively listen for and flag rogue DHCP servers handing out incorrect IP ranges or unauthorized DNS servers performing spoofing.
 
 ---
 
@@ -59,17 +59,6 @@ Bridging the gap between network positioning and application-layer security post
 *   **Default Credential Spraying:** Automatically pass a small list of known IoT default credentials (e.g., `admin/admin`, `root/toor`, `cisco/cisco`) against HTTP/Telnet/SSH interfaces of newly discovered hardware.
 *   **Container & Cloud Enumeration:** Detect if hosts are Docker containers or Kubernetes nodes. Look for exposed internal Kubelets (Port 10250) or Docker daemon sockets (Port 2375).
 *   **Live Traffic Interception (MiTM Proxy):** A module to perform local ARP spoofing to intercept HTTP traffic, capturing basic authentication tokens for forensic demonstration (requires strict user opt-in/warnings).
-
----
-
-## 🎯 6. Target Scope Management (@security-auditor, @pentest-checklist)
-
-In professional engagements, relying solely on broadcast discovery is often insufficient because analysts must operate strictly within predefined Rules of Engagement (RoE).
-
-*   **Manual Host Addition:** Ability to manually add a single target ad-hoc by providing its IP address, Hostname (e.g., `srv-db-01.local`), or MAC address directly into the dashboard.
-*   **Bulk Scope Importing (CIDR/List):** Import a large list of authorized IP addresses, CIDR ranges (e.g., `10.0.0.0/16`), or hostnames from a raw `.txt` or `.csv` file. 
-*   **Nmap XML Ingestion:** Parse and ingest existing scan data from an Nmap `.xml` output file. This allows users to import previously gathered intelligence without needing to actively re-sweep the network.
-*   **Out-of-Scope Blacklisting (WAF/HIDS Avoidance):** Define strict IP addresses, MACs, or entire subnets that the application is explicitly forbidden from touching, alerting, or scanning to ensure strict compliance.
 
 ---
 
@@ -194,18 +183,6 @@ Each workspace swaps the entire UI context, but the **data layer remains shared*
 ### When Separate Apps Would Make Sense
 
 The only scenario justifying a split would be **separate commercial licensing** (e.g., selling a "Network Edition" and a "Professional Edition" independently). Since NetSpecter is open-source MIT, a unified application maximizes value for the community.
-
----
-
-## 🕵️ 8. Passive Network Intelligence (Tshark/Wireshark)
-
-With `tshark` now integrated as a core backend dependency for raw packet capture, NetSpecter can evolve beyond active (noisy) scanning into stealthy, passive network intelligence gathering.
-
-* **Rogue DHCP Detection (Active/Passive):** Listen globally for `DHCP Offer` and `DHCP Ack` packets (`tshark -Y "dhcp"`). Alert the user immediately if an unknown IP address or MAC address starts handing out leases or malicious DNS server routes.
-* **Cleartext Credential Sniffing:** Automatically filter for and extract usernames and passwords traversing the wire in plain text on insecure protocols: FTP (Port 21), Telnet (Port 23), HTTP Basic Auth, and POP3/IMAP.
-* **DNS Query Harvesting (Passive Host Discovery):** Instead of actively pinging subnets, silently listen to broadcast DNS and mDNS (Bonjour/Avahi) queries (`tshark -Y "dns or mdns"`). Build a list of active hostnames and IP addresses completely invisibly without triggering IDS/IPS systems.
-* **Live PCAP Exporting:** Allow a user to right-click an interface or a specific host and generate a standard `.pcap` file of all traffic related to that IP, which they can later open directly in Wireshark for deep forensic dissection.
-* **ARP Spoofing Detection:** Monitor the local network for gratuitous ARP replies or rapid MAC address changes for the default gateway, violently alerting the user if a Man-in-the-Middle attack is actively occurring on their subnet.
 
 ---
 

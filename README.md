@@ -27,6 +27,10 @@ A modern, cross-platform desktop application built with Electron, Node.js, and V
 - **VLAN Hopping & Tag Detection**: Integrates with Wireshark's `tshark` CLI to passively listen for 802.1Q tagged frames on your network interfaces, exposing misconfigured trunk ports and VLAN hopping vulnerabilities.
 - **Passive Network Intelligence**: Advanced raw packet capture capabilities utilizing the `tshark` backend. Detect rogue DHCP servers, sniff cleartext credentials (FTP, HTTP Basic, POP3, IMAP), passively harvest DNS/mDNS queries to discover stealth hosts, detect ARP spoofing attacks in real-time, and seamlessly export live traffic to `.pcap` files.
 - **Persistent Settings UI**: A unified modal to manage backend orchestration tool dependencies. Automatically detects Nmap and Tshark availability in your system's PATH and lets you enable/disable integrations on the fly.
+- **SNMP Walking & MIB Parsing**: Walk SNMPv1/v2c/v3 devices to pull routing tables, interface stats, and firmware versions.
+- **Interactive Topology Map**: Visual network graph powered by Cytoscape.js showing hosts, subnets, and gateway relationships.
+- **Live PCAP Capture & Analysis**: Right-click any host for real-time packet capture with protocol breakdown and cleartext detection.
+- **Rogue DNS Detection**: Passive detection of unauthorized DNS servers and DNS spoofing attacks.
 
 ---
 
@@ -162,3 +166,4 @@ This project is open-sourced software licensed under the [MIT license](LICENSE).
 ### Third-Party Software Disclosures
 - **Nmap**: This application can optionally interact with [Nmap](https://nmap.org) if the user has independently installed it on their system. NetSpecter is merely a graphical front-end that executes Nmap via standard command-line interfaces. NetSpecter does **not** distribute, incorporate, or statically link Nmap's source code, binary executables, or libraries. Nmap is a registered trademark of Insecure.Com LLC and is distributed under its own proprietary license (NPSL). NetSpecter is not affiliated with, endorsed by, or sponsored by the Nmap Project.
 - **Wireshark/Tshark**: NetSpecter can optionally utilize `tshark` (part of [Wireshark](https://www.wireshark.org/)) for passive VLAN tag discovery if installed independently. Wireshark and the "fin" logo are registered trademarks of the Wireshark Foundation. NetSpecter is not affiliated with, endorsed by, or sponsored by the Wireshark Foundation.
+- **Net-SNMP & Cytoscape**: NetSpecter bundles [net-snmp](https://www.npmjs.com/package/net-snmp) for JavaScript SNMP communication and [cytoscape](https://js.cytoscape.org/) for graph visualization. Both are open-source and MIT-licensed.

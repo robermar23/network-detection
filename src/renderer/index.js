@@ -210,6 +210,17 @@ loadAndApplySettings();
 elements.btnViewGrid.addEventListener('click', () => { state.currentView = 'grid'; domUtils.applyViewStyle(state); });
 elements.btnViewList.addEventListener('click', () => { state.currentView = 'list'; domUtils.applyViewStyle(state); });
 elements.btnViewTable.addEventListener('click', () => { state.currentView = 'table'; domUtils.applyViewStyle(state); });
+elements.btnViewTopology.addEventListener('click', () => { 
+  state.currentView = 'topology'; 
+  domUtils.applyViewStyle(state); 
+  import('./topology.js').then(m => m.updateTopologyData(state.hosts));
+});
+
+document.addEventListener('open-host-details', (e) => {
+  const ip = e.detail;
+  const host = state.hosts.find(h => h.ip === ip);
+  if (host) openDetailsPanel(host);
+});
 
 async function initInterfaces() {
   try {
@@ -240,6 +251,45 @@ async function initInterfaces() {
 }
 
 initInterfaces();
+
+const passiveInterfaceSelect = document.getElementById('passive-interface-select');
+const btnRefreshPassiveInterfaces = document.getElementById('btn-refresh-passive-interfaces');
+
+async function initPassiveInterfaces() {
+  if (!passiveInterfaceSelect) return;
+  try {
+    const interfaces = await api.getInterfaces();
+    passiveInterfaceSelect.innerHTML = '';
+    
+    if (interfaces.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'No interfaces found';
+      passiveInterfaceSelect.appendChild(opt);
+      return;
+    }
+
+    interfaces.forEach(iface => {
+      const opt = document.createElement('option');
+      opt.value = iface.subnet;
+      opt.dataset.name = iface.name; // Store the physical interface name for tshark
+      opt.textContent = iface.label;
+      passiveInterfaceSelect.appendChild(opt);
+    });
+  } catch (e) {
+    console.error('Failed to load passive interfaces:', e);
+    passiveInterfaceSelect.innerHTML = '<option value="">Error loading</option>';
+  }
+}
+
+initPassiveInterfaces();
+
+if (btnRefreshPassiveInterfaces) {
+  btnRefreshPassiveInterfaces.addEventListener('click', () => {
+    passiveInterfaceSelect.innerHTML = '<option value="">Refreshing...</option>';
+    initPassiveInterfaces();
+  });
+}
 
 elements.btnRefreshInterfaces.addEventListener('click', () => {
   elements.interfaceSelect.innerHTML = '<option value="">Refreshing...</option>';
@@ -1022,11 +1072,13 @@ function openDetailsPanel(host) {
     </div>
     
     <div class="deep-scan-container" style="margin-top: 10px;">
-      <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 4px; border: 1px solid var(--border-glass); justify-content: center;">
+      <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 4px; border: 1px solid var(--border-glass); justify-content: center; flex-wrap: wrap;">
         <span style="font-size: 12px; color: var(--text-muted); margin-right: 4px;">Engine:</span>
         <button id="btn-engine-native" class="btn icon-only active" title="Native Scanner" style="padding: 4px 12px; border-radius: 4px; font-size: 12px; height: 24px; box-shadow: none;">Native</button>
         <button id="btn-engine-nmap" class="btn icon-only" title="Nmap Scanner" style="padding: 4px 12px; border-radius: 4px; font-size: 12px; height: 24px; box-shadow: none;">Nmap</button>
         <button id="btn-engine-ncat" class="btn icon-only" title="Ncat Netcat" style="padding: 4px 12px; border-radius: 4px; font-size: 12px; height: 24px; box-shadow: none;">Ncat</button>
+        <button id="btn-engine-snmp" class="btn icon-only" title="SNMP Walker" style="padding: 4px 12px; border-radius: 4px; font-size: 12px; height: 24px; box-shadow: none;">SNMP</button>
+        <button id="btn-engine-pcap" class="btn icon-only" title="PCAP Analysis" style="padding: 4px 12px; border-radius: 4px; font-size: 12px; height: 24px; box-shadow: none;">PCAP</button>
       </div>
 
       <!-- Native Actions -->
@@ -1074,9 +1126,63 @@ function openDetailsPanel(host) {
         </button>
       </div>
 
+      <!-- SNMP Actions -->
+      <div id="snmp-actions" style="display: none; flex-direction: column; gap: 8px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 6px; border: 1px solid var(--border-glass);">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <select id="input-snmp-version" class="dropdown-select" style="width: 80px;">
+            <option value="v1">v1</option>
+            <option value="v2c" selected>v2c</option>
+            <option value="v3">v3</option>
+          </select>
+          <input type="text" id="input-snmp-community" class="text-input" placeholder="Community (e.g. public)" style="flex-grow: 1;" value="public">
+        </div>
+        
+        <div id="snmp-v3-auth" style="display: none; flex-direction: column; gap: 8px;">
+          <input type="text" id="input-snmp-user" class="text-input full-width" placeholder="Username (v3)">
+          <div style="display: flex; gap: 8px;">
+            <select id="input-snmp-auth-proto" class="dropdown-select" style="width: 80px;">
+              <option value="sha">SHA</option>
+              <option value="md5">MD5</option>
+            </select>
+            <input type="password" id="input-snmp-auth-key" class="text-input" placeholder="Auth Password" style="flex-grow: 1;">
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <select id="input-snmp-priv-proto" class="dropdown-select" style="width: 80px;">
+              <option value="aes">AES</option>
+              <option value="des">DES</option>
+            </select>
+            <input type="password" id="input-snmp-priv-key" class="text-input" placeholder="Priv Password" style="flex-grow: 1;">
+          </div>
+        </div>
+
+        <button id="btn-run-snmp" class="btn info full-width" title="Walk MIB Tree">
+          <span class="icon">📡</span> SNMP Walk
+        </button>
+      </div>
+
+      <!-- PCAP Actions -->
+      <div id="pcap-actions" style="display: none; flex-direction: column; gap: 8px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 6px; border: 1px solid var(--border-glass);">
+        <div style="font-size: 12px; color: var(--text-muted); text-align: center; margin-bottom: 4px;">Start a live packet capture filtered for this host.</div>
+        <button id="btn-run-pcap" class="btn primary full-width" title="Open PCAP Capture Panel">
+          <span class="icon">📦</span> Capture Packets
+        </button>
+      </div>
+
       <!-- Results Containers -->
       <div id="deep-scan-results" class="deep-scan-results selectable-text"></div>
       <div id="nmap-scan-results" class="selectable-text" style="display: none; margin-top: 12px; flex-direction: column; gap: 8px;"></div>
+      <div id="snmp-scan-results" class="selectable-text" style="display: none; margin-top: 12px; flex-direction: column; gap: 8px;">
+        <div id="snmp-progress-container" style="display: none; margin-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; color: var(--text-muted);">
+            <span>Walking Tree...</span>
+            <span id="snmp-progress-count">0 OIDs</span>
+          </div>
+          <div class="progress-bar-bg" style="height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden;">
+            <div id="snmp-progress-fill" class="progress-bar-fill" style="width: 100%; height: 100%; background: var(--info); animation: progress-indeterminate 1.5s infinite linear; transform-origin: left;"></div>
+          </div>
+        </div>
+        <div id="snmp-data-container" style="display: flex; flex-direction: column; gap: 8px;"></div>
+      </div>
     </div>
   `;
 
@@ -1122,7 +1228,7 @@ function openDetailsPanel(host) {
       vHeader.style.cssText = 'font-weight: 600; font-family: monospace; color: var(--danger); margin-bottom: 4px;';
       vHeader.textContent = `${v.id} (${v.severity.toUpperCase()})`;
       const vBody = document.createElement('div');
-      vBody.style.cssText = 'color: var(--text-muted); line-height: 1.4; white-space: pre-wrap;';
+      vBody.style.cssText = 'color: var(--text-muted); line-height: 1.4; white-space: pre-wrap; word-break: break-all;';
       vBody.textContent = v.details;
       
       vDiv.appendChild(vHeader);
@@ -1141,6 +1247,7 @@ function openDetailsPanel(host) {
   document.getElementById('btn-nmap-vuln').setAttribute('data-ip', host.ip);
   document.getElementById('btn-nmap-custom').setAttribute('data-ip', host.ip);
   document.getElementById('btn-run-ncat').setAttribute('data-ip', host.ip);
+  document.getElementById('btn-run-pcap').setAttribute('data-ip', host.ip);
   document.getElementById('nse-search-input').placeholder = `Search ${state.nmapScripts?.length || 0} scripts (e.g. smb-)`;
 
   renderSavedHistory(host);
@@ -1162,19 +1269,30 @@ function attachDetailsPanelListeners(host) {
   const nativeActions = document.getElementById('native-actions');
   const nmapActions = document.getElementById('nmap-actions');
   const ncatActions = document.getElementById('ncat-actions');
+  const snmpActions = document.getElementById('snmp-actions');
+  const pcapActions = document.getElementById('pcap-actions');
   
   const dsResults = document.getElementById('deep-scan-results');
   const nmapScanResults = document.getElementById('nmap-scan-results');
+  const snmpScanResults = document.getElementById('snmp-scan-results');
+
+  const btnEngineSnmp = document.getElementById('btn-engine-snmp');
+  const btnEnginePcap = document.getElementById('btn-engine-pcap');
 
   btnEngineNative.addEventListener('click', () => {
     btnEngineNative.classList.add('active');
     btnEngineNmap.classList.remove('active');
     btnEngineNcat.classList.remove('active');
+    btnEngineSnmp.classList.remove('active');
+    btnEnginePcap.classList.remove('active');
     nativeActions.style.display = 'block';
     nmapActions.style.display = 'none';
     ncatActions.style.display = 'none';
+    snmpActions.style.display = 'none';
+    pcapActions.style.display = 'none';
     dsResults.style.display = 'flex';
     nmapScanResults.style.display = 'none';
+    snmpScanResults.style.display = 'none';
   });
 
   btnEngineNmap.addEventListener('click', () => {
@@ -1185,11 +1303,16 @@ function attachDetailsPanelListeners(host) {
     btnEngineNmap.classList.add('active');
     btnEngineNative.classList.remove('active');
     btnEngineNcat.classList.remove('active');
+    btnEngineSnmp.classList.remove('active');
+    btnEnginePcap.classList.remove('active');
     nmapActions.style.display = 'flex';
     nativeActions.style.display = 'none';
     ncatActions.style.display = 'none';
+    snmpActions.style.display = 'none';
+    pcapActions.style.display = 'none';
     nmapScanResults.style.display = 'flex';
     dsResults.style.display = 'none';
+    snmpScanResults.style.display = 'none';
   });
 
   btnEngineNcat.addEventListener('click', () => {
@@ -1200,11 +1323,48 @@ function attachDetailsPanelListeners(host) {
     btnEngineNcat.classList.add('active');
     btnEngineNative.classList.remove('active');
     btnEngineNmap.classList.remove('active');
+    btnEngineSnmp.classList.remove('active');
+    btnEnginePcap.classList.remove('active');
     ncatActions.style.display = 'flex';
     nativeActions.style.display = 'none';
     nmapActions.style.display = 'none';
+    snmpActions.style.display = 'none';
+    pcapActions.style.display = 'none';
     nmapScanResults.style.display = 'flex';
     dsResults.style.display = 'none';
+    snmpScanResults.style.display = 'none';
+  });
+
+  btnEngineSnmp.addEventListener('click', () => {
+    btnEngineSnmp.classList.add('active');
+    btnEngineNative.classList.remove('active');
+    btnEngineNmap.classList.remove('active');
+    btnEngineNcat.classList.remove('active');
+    btnEnginePcap.classList.remove('active');
+    snmpActions.style.display = 'flex';
+    nativeActions.style.display = 'none';
+    nmapActions.style.display = 'none';
+    ncatActions.style.display = 'none';
+    pcapActions.style.display = 'none';
+    snmpScanResults.style.display = 'flex';
+    dsResults.style.display = 'none';
+    nmapScanResults.style.display = 'none';
+  });
+
+  btnEnginePcap.addEventListener('click', () => {
+    btnEnginePcap.classList.add('active');
+    btnEngineNative.classList.remove('active');
+    btnEngineNmap.classList.remove('active');
+    btnEngineNcat.classList.remove('active');
+    btnEngineSnmp.classList.remove('active');
+    pcapActions.style.display = 'flex';
+    nativeActions.style.display = 'none';
+    nmapActions.style.display = 'none';
+    ncatActions.style.display = 'none';
+    snmpActions.style.display = 'none';
+    snmpScanResults.style.display = 'none';
+    dsResults.style.display = 'none';
+    nmapScanResults.style.display = 'none';
   });
 
   const btnRunNcat = document.getElementById('btn-run-ncat');
@@ -1227,13 +1387,10 @@ function attachDetailsPanelListeners(host) {
       btnRunNcat.classList.add('pulsing');
       btnRunNcat.innerHTML = `<span class="icon">🔄</span> Running...`;
 
-      let block = document.getElementById(`nmap-live-banner-ncat`);
-      if (!block) {
-        block = document.createElement('pre');
-        block.id = `nmap-live-banner-ncat`;
-        block.className = 'ds-banner selectable-text';
-        nmapScanResults.prepend(block);
-      }
+      let block = document.createElement('pre');
+      block.id = `nmap-live-banner-ncat`;
+      block.className = 'ds-banner selectable-text';
+      nmapScanResults.prepend(block);
       block.innerText = 'Connecting via Ncat...';
       
       await api.runNcat({
@@ -1241,6 +1398,76 @@ function attachDetailsPanelListeners(host) {
          port: portVal,
          payload: document.getElementById('input-ncat-payload').value
       });
+    });
+  }
+
+  // --- SNMP Listeners ---
+  const btnRunSnmp = document.getElementById('btn-run-snmp');
+  const inputSnmpVersion = document.getElementById('input-snmp-version');
+  const inputSnmpCommunity = document.getElementById('input-snmp-community');
+  const snmpV3Auth = document.getElementById('snmp-v3-auth');
+  
+  if (inputSnmpVersion && snmpV3Auth) {
+    inputSnmpVersion.addEventListener('change', (e) => {
+      const isV3 = e.target.value === 'v3';
+      snmpV3Auth.style.display = isV3 ? 'flex' : 'none';
+      inputSnmpCommunity.style.display = isV3 ? 'none' : 'block';
+    });
+  }
+
+  if (btnRunSnmp) {
+    btnRunSnmp.addEventListener('click', async () => {
+      if (btnRunSnmp.getAttribute('data-scanning') === 'true') {
+        api.cancelSnmpWalk(host.ip);
+        btnRunSnmp.innerHTML = `<span class="icon">🛑</span> Cancelling...`;
+        btnRunSnmp.setAttribute('data-scanning', 'cancelling');
+        return;
+      }
+
+      btnRunSnmp.setAttribute('data-scanning', 'true');
+      btnRunSnmp.classList.add('pulsing', 'danger-pulsing');
+      btnRunSnmp.classList.remove('info');
+      btnRunSnmp.innerHTML = `<span class="icon">🛑</span> Cancel Walk...`;
+
+      const dataContainer = document.getElementById('snmp-data-container');
+      if (dataContainer) dataContainer.innerHTML = '';
+      
+      const pContainer = document.getElementById('snmp-progress-container');
+      if (pContainer) pContainer.style.display = 'block';
+
+      const version = inputSnmpVersion.value;
+      const options = { version };
+      
+      if (version === 'v1' || version === 'v2c') {
+        options.community = inputSnmpCommunity.value || 'public';
+      } else if (version === 'v3') {
+        options.user = document.getElementById('input-snmp-user').value;
+        options.authProtocol = document.getElementById('input-snmp-auth-proto').value;
+        options.authKey = document.getElementById('input-snmp-auth-key').value;
+        options.privProtocol = document.getElementById('input-snmp-priv-proto').value;
+        options.privKey = document.getElementById('input-snmp-priv-key').value;
+      }
+
+      try {
+        await api.snmpWalk(host.ip, options);
+      } catch (e) {
+        console.error("SNMP Walk start error:", e);
+      }
+    });
+  }
+
+  const btnRunPcap = document.getElementById('btn-run-pcap');
+  if (btnRunPcap) {
+    btnRunPcap.addEventListener('click', () => {
+      const passivePanel = document.getElementById('passive-panel');
+      const passiveResizer = document.getElementById('passive-resizer');
+      openPanel(passivePanel, passiveResizer);
+      
+      const pcapTabBtn = document.querySelector('.modal-tab[data-passive-tab="pcap"]');
+      if (pcapTabBtn) pcapTabBtn.click();
+      
+      const filterInput = document.getElementById('live-pcap-host');
+      if (filterInput) filterInput.value = `host ${host.ip}`;
     });
   }
 
@@ -1453,7 +1680,8 @@ const vlanResizer = document.getElementById('vlan-resizer');
 const passiveResizer = document.getElementById('passive-resizer');
 
 initResizer(vlanResizer, vlanPanel);
-// passivePanel gets initialized at bottom of file after element is defined
+const passivePanel = document.getElementById('passive-panel');
+initResizer(passiveResizer, passivePanel);
 // elements.sidebarResizer manages detailsPanel
 initResizer(elements.sidebarResizer, elements.detailsPanel);
 
@@ -2335,7 +2563,7 @@ if (window.electronAPI) {
   const passiveTabs = document.querySelectorAll('.modal-tab[data-passive-tab]');
   const passiveTabPanes = document.querySelectorAll('.passive-tab-pane');
   const ui = {};
-  ['dhcp', 'creds', 'dns', 'arp'].forEach(m => {
+  ['dhcp', 'creds', 'dns', 'arp', 'rogue-dns'].forEach(m => {
     ui[m] = {
       toggle: document.getElementById(`toggle-${m}`),
       status: document.getElementById(`status-${m}`),
@@ -2390,8 +2618,87 @@ if (window.electronAPI) {
       tr.appendChild(td);
       return tr;
     } },
-    arp:  { type: 'card', getWaitEl: () => null }
+    arp:  { type: 'card', getWaitEl: () => null },
+    'rogue-dns': { type: 'card', getWaitEl: () => null }
   };
+
+  const btnStartLivePcap = document.getElementById('btn-start-live-pcap');
+  const btnStopLivePcap = document.getElementById('btn-stop-live-pcap');
+  const inputLivePcapHost = document.getElementById('live-pcap-host');
+  const inputLivePcapDuration = document.getElementById('live-pcap-duration');
+  const inputLivePcapBpf = document.getElementById('live-pcap-bpf');
+  const livePcapStats = document.getElementById('live-pcap-total-stats');
+  const livePcapWarnings = document.getElementById('live-pcap-warnings');
+  const livePcapResults = document.getElementById('live-pcap-results');
+
+  btnStartLivePcap?.addEventListener('click', async () => {
+    const selectedOption = passiveInterfaceSelect.options[passiveInterfaceSelect.selectedIndex];
+    if (!selectedOption || !selectedOption.dataset.name) {
+      alert('Please select a valid network interface first.');
+      return;
+    }
+    const ifaceName = selectedOption.dataset.name;
+
+    const hostFilter = inputLivePcapHost.value.trim();
+    if (!hostFilter) {
+      alert('Please provide a Host Filter (IP address) to capture packets for.');
+      return;
+    }
+
+    btnStartLivePcap.disabled = true;
+    btnStopLivePcap.disabled = false;
+    livePcapResults.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:12px;">Capturing packets...</td></tr>';
+    livePcapStats.textContent = '0 Packets / 0 Bytes';
+    livePcapWarnings.textContent = '';
+    
+    state.pcapPackets = [];
+
+    const options = {
+      duration: parseInt(inputLivePcapDuration.value, 10) || 60,
+      host: hostFilter,
+      bpf: inputLivePcapBpf.value.trim() || undefined
+    };
+
+    const res = await api.startPassiveCapture('pcap', ifaceName, options);
+    if (res.status !== 'started') {
+      btnStartLivePcap.disabled = false;
+      btnStopLivePcap.disabled = true;
+      livePcapWarnings.textContent = res.error || 'Failed to start PCAP capture.';
+    }
+  });
+
+  btnStopLivePcap?.addEventListener('click', async () => {
+    await api.stopPassiveCapture('pcap');
+    btnStartLivePcap.disabled = false;
+    btnStopLivePcap.disabled = true;
+  });
+
+  const btnImportLivePcap = document.getElementById('btn-import-live-pcap');
+  btnImportLivePcap?.addEventListener('click', async () => {
+    // We already have a generic browse mechanism or we can use showOpenDialog.
+    // Wait, let's use a native input element programmatically to get the file,
+    // or call an API method to open the file dialog on main process.
+    // Looking at the preload / main.js, we don't have a direct "importPcapDialog" method.
+    // Let's create an input element dynamically.
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.pcap,.pcapng';
+    fileInput.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      livePcapResults.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:12px;">Analyzing imported PCAP...</td></tr>';
+      livePcapStats.textContent = '0 Packets / 0 Bytes';
+      livePcapWarnings.textContent = '';
+      state.pcapPackets = [];
+
+      const res = await api.analyzePcapFile(file.path);
+      if (res.status !== 'started') {
+         livePcapWarnings.textContent = res.error || 'Failed to analyze PCAP file.';
+      }
+    };
+    fileInput.click();
+  });
 
   async function handlePassiveToggle(moduleKey, iface) {
     const { requiresConsent, getWaitEl } = passiveModulesConfig[moduleKey];
@@ -2438,7 +2745,7 @@ if (window.electronAPI) {
     }
   }
 
-  ['dhcp', 'creds', 'dns', 'arp'].forEach(m => {
+  ['dhcp', 'creds', 'dns', 'arp', 'rogue-dns'].forEach(m => {
     ui[m].toggle?.addEventListener('change', (e) => {
       handlePassiveToggle(m, passiveInterfaceSelect.value);
     });
@@ -2458,7 +2765,7 @@ if (window.electronAPI) {
 
   btnStopAllPassive?.addEventListener('click', async () => {
     await api.stopAllPassive();
-    ['dhcp', 'creds', 'dns', 'arp'].forEach(m => {
+    ['dhcp', 'creds', 'dns', 'arp', 'rogue-dns'].forEach(m => {
       ui[m].toggle.checked = false;
       state.passiveModules[m].running = false;
       ui[m].status.textContent = 'Idle';
@@ -2531,7 +2838,7 @@ if (window.electronAPI) {
     const tdPass = document.createElement('td');
     tdPass.className = 'selectable-text';
     tdPass.style.color = 'var(--danger)';
-    tdPass.textContent = cred.maskedPassword;
+      tdPass.textContent = cred.maskedPassword;
     
     tr.appendChild(tdProto);
     tr.appendChild(tdSrc);
@@ -2642,6 +2949,78 @@ if (window.electronAPI) {
     ui.arp.results.prepend(el);
   });
 
+  window.electronAPI.onPassiveRogueDnsAlert && window.electronAPI.onPassiveRogueDnsAlert((alertMsg) => {
+    state.passiveModules['rogue-dns'].alerts.push(alertMsg);
+    ui['rogue-dns'].badge.textContent = state.passiveModules['rogue-dns'].alerts.length;
+    
+    if (state.passiveModules['rogue-dns'].alerts.length === 1) ui['rogue-dns'].results.innerHTML = '';
+    
+    const card = document.createElement('div');
+    card.className = 'ds-record';
+    if (!alertMsg.isTrusted) {
+      card.style.borderLeftColor = 'var(--danger)';
+      card.style.background = 'rgba(235,94,94,0.05)';
+    } else {
+      card.style.borderLeftColor = 'var(--success)';
+      card.style.background = 'rgba(40,167,69,0.05)';
+    }
+
+    const title = document.createElement('div');
+    title.style.display = 'flex';
+    title.style.justifyContent = 'space-between';
+    title.style.alignItems = 'center';
+    title.style.marginBottom = '6px';
+    
+    const srv = document.createElement('span');
+    srv.style.fontWeight = '600';
+    srv.textContent = `${alertMsg.serverIp} (${alertMsg.serverMac})`;
+    
+    const badge = document.createElement('span');
+    badge.style.fontSize = '10px';
+    badge.style.padding = '2px 6px';
+    badge.style.borderRadius = '4px';
+    if (alertMsg.isTrusted) {
+      badge.style.background = 'var(--success)';
+      badge.style.color = '#fff';
+      badge.textContent = 'TRUSTED';
+    } else {
+      badge.style.background = 'var(--danger)';
+      badge.style.color = '#fff';
+      badge.textContent = 'ROGUE';
+    }
+    
+    title.appendChild(srv);
+    title.appendChild(badge);
+
+    const banner = document.createElement('div');
+    banner.className = 'ds-banner selectable-text';
+    const queryDiv = document.createElement('div');
+    queryDiv.textContent = 'Query: ';
+    const queryStrong = document.createElement('strong');
+    queryStrong.textContent = alertMsg.domain;
+    queryDiv.appendChild(queryStrong);
+    
+    const answerDiv = document.createElement('div');
+    answerDiv.textContent = 'Answer: ';
+    const answerStrong = document.createElement('strong');
+    answerStrong.textContent = alertMsg.resolvedIp;
+    answerDiv.appendChild(answerStrong);
+    
+    const timeDiv = document.createElement('div');
+    timeDiv.style.cssText = 'margin-top:4px;font-size:10px;color:rgba(255,255,255,0.5)';
+    timeDiv.textContent = alertMsg.timestamp;
+    
+    banner.appendChild(queryDiv);
+    banner.appendChild(answerDiv);
+    banner.appendChild(timeDiv);
+
+    card.appendChild(title);
+    card.appendChild(banner);
+    ui['rogue-dns'].results.prepend(card);
+    
+    if (!alertMsg.isTrusted) ui['rogue-dns'].badge.classList.add('danger');
+  });
+
   window.electronAPI.onPassiveError && window.electronAPI.onPassiveError((err) => {
     passiveErrorText.textContent = err;
     passiveErrorBanner.style.display = 'block';
@@ -2653,6 +3032,83 @@ if (window.electronAPI) {
   
   window.electronAPI.onPcapExportError && window.electronAPI.onPcapExportError((err) => {
      alert(`PCAP Export Error:\n${err}`);
+  });
+
+  window.electronAPI.onPcapPacketSummary && window.electronAPI.onPcapPacketSummary((summary) => {
+    state.pcapPackets = state.pcapPackets || [];
+    state.pcapPackets.push(summary);
+    if (state.pcapPackets.length > 500) state.pcapPackets.shift(); // Keep last 500
+    
+    const livePcapResults = document.getElementById('live-pcap-results');
+    if (!livePcapResults) return;
+
+    const tr = document.createElement('tr');
+    const tdTime = document.createElement('td');
+    tdTime.style.whiteSpace = 'nowrap';
+    tdTime.textContent = new Date(summary.timestamp).toLocaleTimeString();
+    
+    const tdSrc = document.createElement('td');
+    tdSrc.className = 'selectable-text';
+    tdSrc.textContent = summary.srcIp;
+    
+    const tdDst = document.createElement('td');
+    tdDst.className = 'selectable-text';
+    tdDst.textContent = summary.dstIp;
+    
+    const tdProto = document.createElement('td');
+    const spanProto = document.createElement('span');
+    spanProto.className = 'badge ' + (summary.protocol === 'TCP' ? 'info' : (summary.protocol === 'UDP' ? 'success' : 'warning'));
+    spanProto.textContent = summary.protocol;
+    tdProto.appendChild(spanProto);
+    
+    const tdLen = document.createElement('td');
+    tdLen.textContent = summary.length;
+    
+    const tdInfo = document.createElement('td');
+    tdInfo.className = 'selectable-text text-ellipsis';
+    tdInfo.title = summary.info;
+    tdInfo.textContent = summary.info;
+    
+    tr.appendChild(tdTime);
+    tr.appendChild(tdSrc);
+    tr.appendChild(tdDst);
+    tr.appendChild(tdProto);
+    tr.appendChild(tdLen);
+    tr.appendChild(tdInfo);
+    
+    if (livePcapResults.children[0] && livePcapResults.children[0].textContent.includes('Waiting for')) {
+      livePcapResults.innerHTML = '';
+    } else if (livePcapResults.children[0] && livePcapResults.children[0].textContent.includes('Capturing packets...')) {
+      livePcapResults.innerHTML = '';
+    }
+    
+    livePcapResults.prepend(tr);
+    if (livePcapResults.children.length > 500) {
+      livePcapResults.lastElementChild.remove();
+    }
+  });
+
+  window.electronAPI.onPcapStatsUpdate && window.electronAPI.onPcapStatsUpdate((stats) => {
+    const livePcapStats = document.getElementById('live-pcap-total-stats');
+    const livePcapWarnings = document.getElementById('live-pcap-warnings');
+    if (livePcapStats) {
+      livePcapStats.textContent = `${stats.totalPackets} Packets / ${stats.totalBytes} Bytes`;
+    }
+    if (livePcapWarnings) {
+      livePcapWarnings.textContent = stats.warnings.join(', ');
+    }
+  });
+
+  window.electronAPI.onPcapCaptureComplete && window.electronAPI.onPcapCaptureComplete((msg) => {
+    const btnStartLivePcap = document.getElementById('btn-start-live-pcap');
+    const btnStopLivePcap = document.getElementById('btn-stop-live-pcap');
+    if (btnStartLivePcap) btnStartLivePcap.disabled = false;
+    if (btnStopLivePcap) btnStopLivePcap.disabled = true;
+    
+    const livePcapWarnings = document.getElementById('live-pcap-warnings');
+    if (livePcapWarnings && msg !== 'Capture finished.') {
+      livePcapWarnings.textContent = msg;
+    }
   });
 }
 
@@ -2671,7 +3127,8 @@ function initPassivePanel() {
       passiveInterfaceSelect.innerHTML = '<option value="">Select Interface...</option>';
       interfaces.forEach(iface => {
         const opt = document.createElement('option');
-        opt.value = iface.name; 
+        opt.value = iface.name; // In this modal it used iface.name as value already
+        opt.dataset.name = iface.name; 
         opt.textContent = `${iface.name} (${iface.ip})`;
         passiveInterfaceSelect.appendChild(opt);
       });
@@ -2768,3 +3225,114 @@ function initPassivePanel() {
 }
 
 initPassivePanel();
+
+// --- Global SNMP Listeners ---
+window.electronAPI.onSnmpWalkProgress && window.electronAPI.onSnmpWalkProgress((progress) => {
+  const pCount = document.getElementById('snmp-progress-count');
+  if (pCount) pCount.textContent = `${progress.count} OIDs`;
+});
+
+window.electronAPI.onSnmpWalkResult && window.electronAPI.onSnmpWalkResult((result) => {
+  const container = document.getElementById('snmp-data-container');
+  if (!container) return; // Panel not open or switched
+
+  const el = document.createElement('div');
+  el.className = 'ds-record';
+  
+  const header = document.createElement('div');
+  header.className = 'ds-header';
+  
+  const title = document.createElement('div');
+  title.className = 'ds-header-title';
+  
+  const portSpan = document.createElement('span');
+  portSpan.className = 'ds-port';
+  portSpan.textContent = result.name || result.oid;
+
+  const typeMap = {
+    2: 'Integer', 4: 'OctetString', 5: 'Null', 6: 'OID', 64: 'IpAddress', 65: 'Counter', 66: 'Gauge', 67: 'TimeTicks', 68: 'Opaque'
+  };
+  const typeStr = typeMap[result.type] || `Type ${result.type}`;
+
+  const serviceSpan = document.createElement('span');
+  serviceSpan.className = 'ds-service';
+  serviceSpan.style.marginLeft = '8px';
+  serviceSpan.style.opacity = '0.6';
+  serviceSpan.style.fontSize = '0.85em';
+  serviceSpan.textContent = typeStr;
+
+  title.appendChild(portSpan);
+  title.appendChild(serviceSpan);
+  header.appendChild(title);
+  
+  const valDiv = document.createElement('div');
+  valDiv.className = 'ds-details selectable-text';
+  valDiv.style.fontFamily = 'monospace';
+  valDiv.style.color = 'var(--text-main)';
+  // Handle multiline strings gracefully
+  valDiv.textContent = result.value;
+  
+  el.appendChild(header);
+  el.appendChild(valDiv);
+  container.appendChild(el);
+});
+
+window.electronAPI.onSnmpWalkComplete && window.electronAPI.onSnmpWalkComplete((hostIp) => {
+  const btnRunSnmp = document.getElementById('btn-run-snmp');
+  if (btnRunSnmp) {
+    btnRunSnmp.innerHTML = `<span class="icon">📡</span> SNMP Walk`;
+    btnRunSnmp.setAttribute('data-scanning', 'false');
+    btnRunSnmp.classList.remove('pulsing', 'danger-pulsing');
+    btnRunSnmp.classList.add('info');
+  }
+
+  const pContainer = document.getElementById('snmp-progress-container');
+  if (pContainer) pContainer.style.display = 'none';
+
+  const dataContainer = document.getElementById('snmp-data-container');
+  if (dataContainer && dataContainer.children.length === 0) {
+    const el = document.createElement('div');
+    el.style.textAlign = 'center';
+    el.style.color = 'var(--text-muted)';
+    el.style.fontSize = '12px';
+    el.style.padding = '16px';
+    el.textContent = 'Walk completed with no results or agent unreachable.';
+    dataContainer.appendChild(el);
+  }
+});
+
+window.electronAPI.onSnmpWalkError && window.electronAPI.onSnmpWalkError(({ hostIp, error }) => {
+  const btnRunSnmp = document.getElementById('btn-run-snmp');
+  if (btnRunSnmp) {
+    btnRunSnmp.innerHTML = `<span class="icon">📡</span> SNMP Walk`;
+    btnRunSnmp.setAttribute('data-scanning', 'false');
+    btnRunSnmp.classList.remove('pulsing', 'danger-pulsing');
+    btnRunSnmp.classList.add('info');
+  }
+
+  const pContainer = document.getElementById('snmp-progress-container');
+  if (pContainer) pContainer.style.display = 'none';
+
+  const container = document.getElementById('snmp-data-container');
+  if (!container) return;
+
+  const el = document.createElement('div');
+  el.className = 'ds-record';
+  el.style.borderLeftColor = 'var(--danger)';
+  
+  const header = document.createElement('div');
+  header.style.color = 'var(--danger)';
+  header.style.fontSize = '12px';
+  header.style.fontWeight = 'bold';
+  header.textContent = 'SNMP Error';
+
+  const body = document.createElement('div');
+  body.style.color = 'var(--text-muted)';
+  body.style.fontSize = '11px';
+  body.style.marginTop = '4px';
+  body.textContent = error;
+
+  el.appendChild(header);
+  el.appendChild(body);
+  container.appendChild(el);
+});

@@ -16,6 +16,8 @@ export const elements = {
   btnViewGrid: document.getElementById('btn-view-grid'),
   btnViewList: document.getElementById('btn-view-list'),
   btnViewTable: document.getElementById('btn-view-table'),
+  btnViewTopology: document.getElementById('btn-view-topology'),
+  topologyContainer: document.getElementById('topology-container'),
   filterIp: document.getElementById('filter-ip'),
   filterOs: document.getElementById('filter-os'),
   filterVendor: document.getElementById('filter-vendor'),
@@ -56,7 +58,16 @@ export const domUtils = {
     elements.btnViewGrid.classList.toggle('active', state.currentView === 'grid');
     elements.btnViewList.classList.toggle('active', state.currentView === 'list');
     elements.btnViewTable.classList.toggle('active', state.currentView === 'table');
-    elements.hostGrid.className = `host-${state.currentView}`;
+    elements.btnViewTopology.classList.toggle('active', state.currentView === 'topology');
+    
+    if (state.currentView === 'topology') {
+      elements.hostGrid.style.display = 'none';
+      if (elements.topologyContainer) elements.topologyContainer.style.display = 'block';
+    } else {
+      if (elements.topologyContainer) elements.topologyContainer.style.display = 'none';
+      elements.hostGrid.style.display = '';
+      elements.hostGrid.className = `host-${state.currentView}`;
+    }
     
     if (state.currentView === 'table' && state.hosts.length > 0) {
        const hasHeader = elements.hostGrid.querySelector('.host-table-header');

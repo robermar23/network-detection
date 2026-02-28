@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.10.0](https://github.com/robermar23/netspectre/compare/v1.9.0...v1.10.0) (2026-02-28)
+
+
+### Features
+
+* **snmp:** implement multi-phase intelligence gathering ([bdf19f2](https://github.com/robermar23/netspectre/commit/bdf19f26a5008f8e0e06cac46f32020386e748c2))
+* **snmp:** implement multi-phase intelligence gathering ([0954ec5](https://github.com/robermar23/netspectre/commit/0954ec51c4e9b643172ca327ad8b3f5048b4b41b))
+
 ## [1.9.0](https://github.com/robermar23/netspectre/compare/v1.8.1...v1.9.0) (2026-02-28)
 
 

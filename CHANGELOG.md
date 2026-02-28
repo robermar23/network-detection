@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.10.1](https://github.com/robermar23/netspectre/compare/v1.10.0...v1.10.1) (2026-02-28)
+
+
+### Bug Fixes
+
+* **main:** unify nmap detection and add platform-specific path fallbacks ([0aa5592](https://github.com/robermar23/netspectre/commit/0aa5592ed55b4c15719d855616f0b32e3b064194))
+* **main:** unify nmap detection and add platform-specific path fallbacks ([a4b446f](https://github.com/robermar23/netspectre/commit/a4b446f482fe2b87f065afba541d0ffb49389c34))
+
 ## [1.10.0](https://github.com/robermar23/netspectre/compare/v1.9.0...v1.10.0) (2026-02-28)
 
 

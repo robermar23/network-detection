@@ -13,7 +13,8 @@ vi.mock('../src/main/store.js', () => ({
     if (key === 'nmap.path') return 'nmap';
     return null;
   }),
-  setSetting: vi.fn()
+  setSetting: vi.fn(),
+  checkDependency: vi.fn().mockResolvedValue({ installed: true, output: 'Nmap version 7.92' })
 }));
 
 describe('Nmap Scanner', () => {
@@ -98,8 +99,12 @@ describe('Nmap Scanner', () => {
     const fs = await import('fs');
     vi.spyOn(fs.default, 'existsSync').mockReturnValue(true);
     vi.spyOn(fs.default, 'readdirSync').mockReturnValue(['test-script.nse']);
+    vi.spyOn(fs.default, 'readFileSync').mockReturnValue('categories = {"safe", "discovery"}');
     vi.spyOn(fs.default, 'openSync').mockReturnValue(1);
-    vi.spyOn(fs.default, 'readSync').mockReturnValue(100);
+    vi.spyOn(fs.default, 'readSync').mockImplementation((fd, buffer) => {
+      buffer.write('categories = {"safe", "discovery"}');
+      return 100;
+    });
     vi.spyOn(fs.default, 'closeSync').mockImplementation(() => {});
     
     const { getNmapScripts } = await import('../src/main/nmapScanner.js');

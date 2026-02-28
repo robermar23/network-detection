@@ -1071,6 +1071,16 @@ function openDetailsPanel(host) {
       <div style="display: flex; flex-direction: column; gap: 8px;" id="dp-vulns-container"></div>
     </div>
     
+    <div id="dp-routing-section" style="display: none; margin-top: 10px; border-top: 1px solid var(--border-glass); padding-top: 16px;">
+      <span class="label" style="display:block; margin-bottom: 12px; font-weight: 500; font-size: 14px; color: var(--info);">Known Routing Paths (Subnets)</span>
+      <div id="dp-routing-container" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+    </div>
+    
+    <div id="dp-processes-section" style="display: none; margin-top: 10px; border-top: 1px solid var(--border-glass); padding-top: 16px;">
+      <span class="label" style="display:block; margin-bottom: 12px; font-weight: 500; font-size: 14px; color: var(--warning);">Active Running Processes</span>
+      <div id="dp-processes-container" style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 200px; overflow-y: auto;"></div>
+    </div>
+    
     <div class="deep-scan-container" style="margin-top: 10px;">
       <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 4px; border: 1px solid var(--border-glass); justify-content: center; flex-wrap: wrap;">
         <span style="font-size: 12px; color: var(--text-muted); margin-right: 4px;">Engine:</span>
@@ -1172,6 +1182,11 @@ function openDetailsPanel(host) {
       <div id="deep-scan-results" class="deep-scan-results selectable-text"></div>
       <div id="nmap-scan-results" class="selectable-text" style="display: none; margin-top: 12px; flex-direction: column; gap: 8px;"></div>
       <div id="snmp-scan-results" class="selectable-text" style="display: none; margin-top: 12px; flex-direction: column; gap: 8px;">
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 4px;">
+          <button id="btn-export-snmp" style="display: none;" class="btn small success" title="Download SNMP Results (CSV)">
+            <span class="icon">⬇️</span> Export CSV
+          </button>
+        </div>
         <div id="snmp-progress-container" style="display: none; margin-bottom: 8px;">
           <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; color: var(--text-muted);">
             <span>Walking Tree...</span>
@@ -1234,6 +1249,32 @@ function openDetailsPanel(host) {
       vDiv.appendChild(vHeader);
       vDiv.appendChild(vBody);
       vContainer.appendChild(vDiv);
+    });
+  }
+
+  if (host.routing && host.routing.length > 0) {
+    document.getElementById('dp-routing-section').style.display = 'block';
+    const rContainer = document.getElementById('dp-routing-container');
+    host.routing.forEach(r => {
+      const sp = document.createElement('span');
+      sp.className = 'port-item'; // repurpose badge style
+      sp.style.background = 'var(--info)';
+      sp.style.color = '#fff';
+      sp.textContent = r;
+      rContainer.appendChild(sp);
+    });
+  }
+
+  if (host.processes && host.processes.length > 0) {
+    document.getElementById('dp-processes-section').style.display = 'block';
+    const pContainer = document.getElementById('dp-processes-container');
+    host.processes.forEach(p => {
+      const sp = document.createElement('span');
+      sp.className = 'port-item';
+      sp.style.background = 'rgba(255,255,255,0.1)';
+      sp.style.border = '1px solid var(--border-glass)';
+      sp.textContent = p;
+      pContainer.appendChild(sp);
     });
   }
 
@@ -1432,6 +1473,10 @@ function attachDetailsPanelListeners(host) {
       const dataContainer = document.getElementById('snmp-data-container');
       if (dataContainer) dataContainer.innerHTML = '';
       
+      const btnExportSnmp = document.getElementById('btn-export-snmp');
+      if (btnExportSnmp) btnExportSnmp.style.display = 'none';
+      window.currentSnmpWalkData = [];
+      
       const pContainer = document.getElementById('snmp-progress-container');
       if (pContainer) pContainer.style.display = 'block';
 
@@ -1454,6 +1499,28 @@ function attachDetailsPanelListeners(host) {
         console.error("SNMP Walk start error:", e);
       }
     });
+  }
+
+  const btnExportSnmp = document.getElementById('btn-export-snmp');
+  if (btnExportSnmp) {
+    btnExportSnmp.onclick = () => {
+       if (!window.currentSnmpWalkData || window.currentSnmpWalkData.length === 0) return;
+       
+       let csvContent = "data:text/csv;charset=utf-8,OID,Name,Type,Value\n";
+       window.currentSnmpWalkData.forEach(row => {
+          const cleanValue = String(row.value).replace(/"/g, '""'); // Escape CSV quotes
+          const typeMap = { 2: 'Integer', 4: 'OctetString', 5: 'Null', 6: 'OID', 64: 'IpAddress', 65: 'Counter', 66: 'Gauge', 67: 'TimeTicks', 68: 'Opaque' };
+          const typeStr = typeMap[row.type] || `Type ${row.type}`;
+          csvContent += `"${row.oid}","${row.name || ''}","${typeStr}","${cleanValue}"\n`;
+       });
+       const encodedUri = "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent.replace("data:text/csv;charset=utf-8,", ""));
+       const link = document.createElement("a");
+       link.setAttribute("href", encodedUri);
+       link.setAttribute("download", `snmp_walk_${host.ip}_${new Date().getTime()}.csv`);
+       document.body.appendChild(link);
+       link.click();
+       document.body.removeChild(link);
+    };
   }
 
   const btnRunPcap = document.getElementById('btn-run-pcap');
@@ -2039,9 +2106,18 @@ if (window.electronAPI) {
   window.electronAPI.onHostFound((hostData) => {
     const existingIdx = state.hosts.findIndex(h => h.ip === hostData.ip);
     if (existingIdx >= 0) {
-      state.hosts[existingIdx] = { ...state.hosts[existingIdx], ...hostData };
+      state.hosts[existingIdx] = { 
+        ...state.hosts[existingIdx], 
+        ...hostData,
+        routing: state.hosts[existingIdx].routing || [],
+        processes: state.hosts[existingIdx].processes || []
+      };
     } else {
-      state.hosts.push(hostData);
+      state.hosts.push({
+        ...hostData,
+        routing: hostData.routing || [],
+        processes: hostData.processes || []
+      });
     }
     debouncedRenderAllHosts();
     
@@ -2859,7 +2935,9 @@ if (window.electronAPI) {
         mac: 'Unknown',
         status: 'online',
         hostname: host.hostname,
-        vendor: 'Unknown (Passive DNS)'
+        vendor: 'Unknown (Passive DNS)',
+        routing: [],
+        processes: []
       };
       state.hosts.push(newHost);
       debouncedRenderAllHosts();
@@ -3227,14 +3305,140 @@ function initPassivePanel() {
 initPassivePanel();
 
 // --- Global SNMP Listeners ---
+window.electronAPI.onSnmpIntel && window.electronAPI.onSnmpIntel((intel) => {
+  if (intel.type === 'arp-discovery' && intel.discoveredIp) {
+    console.log('[UI SNMP Intel] Received ARP payload:', intel.discoveredIp, intel.discoveredMac);
+    const existingIdx = state.hosts.findIndex(h => h.ip === intel.discoveredIp);
+    if (existingIdx === -1) {
+      window.electronAPI.settings.get('blacklist').then(blacklistStr => {
+         const blacklist = blacklistStr ? blacklistStr.split(',').map(s=>s.trim()) : [];
+         if (!blacklist.includes(intel.discoveredIp) && intel.discoveredIp !== '127.0.0.1' && intel.discoveredIp !== '0.0.0.0') {
+            state.hosts.push({
+              ip: intel.discoveredIp,
+              mac: intel.discoveredMac || 'Unknown',
+              hostname: 'Unknown',
+              vendor: 'Unknown',
+              os: 'Unknown',
+              status: 'online', // we know it's online because it's in an active ARP cache
+              ports: [],
+              vulnerabilities: [],
+              routing: [],
+              processes: [],
+              source: 'snmp-arp'
+            });
+            console.log(`[SNMP Intel] Auto-discovered new host via ARP: ${intel.discoveredIp}`);
+            debouncedRenderAllHosts();
+         }
+      });
+    } else {
+      // If the host exists but lacks a MAC address, silently enrich it
+      if (state.hosts[existingIdx].mac === 'Unknown' && intel.discoveredMac) {
+         state.hosts[existingIdx].mac = intel.discoveredMac;
+         console.log(`[SNMP Intel] Enriched existing host MAC via ARP: ${intel.discoveredIp}`);
+         debouncedRenderAllHosts();
+      }
+    }
+    return; // Stop processing since this was an ARP payload
+  }
+
+  // Standard OS/Vendor/Hostname intelligence matching
+  const hostIdx = state.hosts.findIndex(h => h.ip === intel.targetIp);
+  if (hostIdx >= 0) {
+    let changed = false;
+    
+    if (intel.type === 'os' && intel.value) {
+      if (state.hosts[hostIdx].os !== intel.value) {
+         state.hosts[hostIdx].os = intel.value;
+         changed = true;
+      }
+    } else if (intel.type === 'hostname' && intel.value) {
+      if (state.hosts[hostIdx].hostname !== intel.value) {
+         state.hosts[hostIdx].hostname = intel.value;
+         changed = true;
+      }
+    } else if (intel.type === 'vendor' && intel.value) {
+      if (state.hosts[hostIdx].vendor !== intel.value) {
+         state.hosts[hostIdx].vendor = intel.value;
+         changed = true;
+      }
+    } else if (intel.type === 'process-discovery' && intel.processName) {
+      if (!state.hosts[hostIdx].processes) state.hosts[hostIdx].processes = [];
+      if (!state.hosts[hostIdx].processes.includes(intel.processName)) {
+         state.hosts[hostIdx].processes.push(intel.processName);
+         changed = true;
+      }
+    } else if (intel.type === 'route-discovery' && intel.routeIp) {
+      if (!state.hosts[hostIdx].routing) state.hosts[hostIdx].routing = [];
+      if (!state.hosts[hostIdx].routing.includes(intel.routeIp)) {
+         state.hosts[hostIdx].routing.push(intel.routeIp);
+         changed = true;
+      }
+    }
+    
+    if (changed) {
+       // Silently update the core data, and ping the debouncer to redraw the host grid
+       debouncedRenderAllHosts();
+
+       // If the Host Details panel is currently open for THIS host, live-update the text DOM
+       const btnRunDeepScan = document.getElementById('btn-run-deep-scan');
+       if (btnRunDeepScan && btnRunDeepScan.getAttribute('data-ip') === intel.targetIp) {
+         if (intel.type === 'os') {
+            const elOs = document.getElementById('dp-os');
+            if (elOs) elOs.innerText = intel.value;
+         } else if (intel.type === 'hostname') {
+            const elHostname = document.getElementById('dp-hostname');
+            if (elHostname) elHostname.innerText = intel.value;
+         } else if (intel.type === 'process-discovery') {
+            document.getElementById('dp-processes-section').style.display = 'block';
+            const pContainer = document.getElementById('dp-processes-container');
+            if (pContainer) {
+               const sp = document.createElement('span');
+               sp.className = 'port-item';
+               sp.style.background = 'rgba(255,255,255,0.1)';
+               sp.style.border = '1px solid var(--border-glass)';
+               sp.textContent = intel.processName;
+               pContainer.appendChild(sp);
+            }
+         } else if (intel.type === 'route-discovery') {
+            document.getElementById('dp-routing-section').style.display = 'block';
+            const rContainer = document.getElementById('dp-routing-container');
+            if (rContainer) {
+               const sp = document.createElement('span');
+               sp.className = 'port-item';
+               sp.style.background = 'var(--info)';
+               sp.style.color = '#fff';
+               sp.textContent = intel.routeIp;
+               rContainer.appendChild(sp);
+            }
+         }
+       }
+    }
+  }
+});
+
 window.electronAPI.onSnmpWalkProgress && window.electronAPI.onSnmpWalkProgress((progress) => {
   const pCount = document.getElementById('snmp-progress-count');
   if (pCount) pCount.textContent = `${progress.count} OIDs`;
 });
 
 window.electronAPI.onSnmpWalkResult && window.electronAPI.onSnmpWalkResult((result) => {
+  let dataLen = 0;
+  if (window.currentSnmpWalkData) {
+     dataLen = window.currentSnmpWalkData.push(result);
+  }
+
   const container = document.getElementById('snmp-data-container');
   if (!container) return; // Panel not open or switched
+
+  if (dataLen > 100) {
+     if (dataLen === 101) {
+        const msg = document.createElement('div');
+        msg.style.cssText = 'text-align:center; padding: 16px; color: var(--warning); font-size: 13px; font-weight: 500; border-top: 1px solid var(--border-glass); margin-top: 8px; margin-bottom: 8px;';
+        msg.innerHTML = '<span class="icon">⚠️</span> Showing first 100 results to prevent UI freezing.<br>Please click <b>Export CSV</b> above to analyze the full MIB tree dataset.';
+        container.appendChild(msg);
+     }
+     return;
+  }
 
   const el = document.createElement('div');
   el.className = 'ds-record';
@@ -3286,6 +3490,11 @@ window.electronAPI.onSnmpWalkComplete && window.electronAPI.onSnmpWalkComplete((
     btnRunSnmp.classList.add('info');
   }
 
+  const btnExportSnmp = document.getElementById('btn-export-snmp');
+  if (btnExportSnmp && window.currentSnmpWalkData && window.currentSnmpWalkData.length > 0) {
+     btnExportSnmp.style.display = 'block';
+  }
+
   const pContainer = document.getElementById('snmp-progress-container');
   if (pContainer) pContainer.style.display = 'none';
 
@@ -3308,6 +3517,11 @@ window.electronAPI.onSnmpWalkError && window.electronAPI.onSnmpWalkError(({ host
     btnRunSnmp.setAttribute('data-scanning', 'false');
     btnRunSnmp.classList.remove('pulsing', 'danger-pulsing');
     btnRunSnmp.classList.add('info');
+  }
+
+  const btnExportSnmp = document.getElementById('btn-export-snmp');
+  if (btnExportSnmp && window.currentSnmpWalkData && window.currentSnmpWalkData.length > 0) {
+     btnExportSnmp.style.display = 'block';
   }
 
   const pContainer = document.getElementById('snmp-progress-container');

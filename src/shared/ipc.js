@@ -33,6 +33,7 @@ export const IPC_CHANNELS = {
   SNMP_WALK_PROGRESS: 'snmp-walk-progress',
   SNMP_WALK_COMPLETE: 'snmp-walk-complete',
   SNMP_WALK_ERROR: 'snmp-walk-error',
+  SNMP_INTEL: 'snmp-intel',
 
   // Nmap Channels
   CHECK_NMAP: 'check-nmap',

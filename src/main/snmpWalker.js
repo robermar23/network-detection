@@ -37,8 +37,7 @@ function createSession(targetIp, options) {
     return snmp.createSession(targetIp, options.community || 'public', sessionOptions);
   }
 }
-
-export function snmpWalk(targetIp, options, onResult, onProgress, onComplete, onError) {
+export function snmpWalk(targetIp, options, onResult, onProgress, onComplete, onError, onIntelligence) {
   if (activeWalks.has(targetIp)) {
     if (onError) onError({ targetIp, error: 'A walk is already in progress for this host.' });
     return false;
@@ -48,7 +47,7 @@ export function snmpWalk(targetIp, options, onResult, onProgress, onComplete, on
     const session = createSession(targetIp, options);
     activeWalks.set(targetIp, session);
 
-    // MIB-2 Subtree (covers system, interfaces, at, ip, icmp, tcp, udp, egp)
+    // MIB-2 Subtree (covers system, interfaces, at, ip, icmp, tcp, udp, egp, and host-resources)
     // We walk 1.3.6.1.2.1 which is the standard internet management subtree
     const rootOid = options.rootOid || '1.3.6.1.2.1'; 
     let oidCount = 0;
@@ -98,6 +97,60 @@ export function snmpWalk(targetIp, options, onResult, onProgress, onComplete, on
           } else {
              // Hex format often used for MACs (e.g. 00:1A:2B:...)
              val = val.toString('hex').match(/.{1,2}/g)?.join(':') || '';
+          }
+        }
+
+        // --- SNMP Intelligence Extraction ---
+        if (onIntelligence) {
+          if (oid === '1.3.6.1.2.1.1.1.0') { // sysDescr
+            let osVal = val;
+            let vendorVal = '';
+            
+            // Windows typically formats sysDescr as "Hardware: <hw> - Software: <os>"
+            if (val.includes('Hardware:') && val.includes('Software:')) {
+              const parts = val.split(' - Software: ');
+              vendorVal = parts[0].replace('Hardware: ', '').trim();
+              if (parts.length > 1) {
+                osVal = parts[1].trim();
+              }
+            }
+            
+            onIntelligence({ type: 'os', targetIp, value: osVal });
+            if (vendorVal) {
+              onIntelligence({ type: 'vendor', targetIp, value: vendorVal });
+            }
+          } else if (oid === '1.3.6.1.2.1.1.5.0') { // sysName
+            onIntelligence({ type: 'hostname', targetIp, value: val });
+          } else if (oid.startsWith('1.3.6.1.2.1.4.22.1.2.') || oid.startsWith('1.3.6.1.2.1.3.1.1.2.')) { 
+            // ipNetToMediaPhysAddress (Standard) or atPhysAddress (Legacy/Windows)
+            const ipParts = oid.split('.');
+            let discoveredIp = '';
+            // Make sure we extract the valid IPv4 even if the interface ID format varies
+            if (ipParts.length >= 4) {
+               discoveredIp = ipParts.slice(-4).join('.');
+            }
+            console.log(`[SNMP Walker] Found ARP root ${oid}, extracted IP: ${discoveredIp}, raw MAC: ${val}`);
+            if (discoveredIp && val && !val.includes('00:00:00:00:00:00') && !val.includes('ff:ff:ff:ff:ff:ff')) {
+               console.log(`[SNMP Walker] Emitting arp-discovery for ${discoveredIp} (${val})`);
+               onIntelligence({ type: 'arp-discovery', targetIp, discoveredIp, discoveredMac: val });
+            } else {
+               console.log(`[SNMP Walker] Discarded arp-discovery for ${discoveredIp} because it was dummy or empty.`);
+            }
+          } else if (oid.startsWith('1.3.6.1.2.1.25.4.2.1.2.')) {
+            // hrSWRunName (Running Processes)
+            if (val && typeof val === 'string' && val.trim().length > 0) {
+               onIntelligence({ type: 'process-discovery', targetIp, processName: val.trim() });
+            }
+          } else if (oid.startsWith('1.3.6.1.2.1.4.21.1.1.')) {
+            // ipRouteDest (Routing Table IPv4 Destinations)
+            const ipParts = oid.split('.');
+            let destIp = '';
+            if (ipParts.length >= 4) {
+               destIp = ipParts.slice(-4).join('.');
+            }
+            if (destIp && destIp !== '0.0.0.0' && destIp !== '127.0.0.0' && destIp !== '127.0.0.1') {
+               onIntelligence({ type: 'route-discovery', targetIp, routeIp: destIp });
+            }
           }
         }
 

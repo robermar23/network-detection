@@ -1072,7 +1072,7 @@ function openDetailsPanel(host) {
     </div>
     
     <div class="deep-scan-container" style="margin-top: 10px;">
-      <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 4px; border: 1px solid var(--border-glass); justify-content: center; overflow-x: auto;">
+      <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 4px; border: 1px solid var(--border-glass); justify-content: center; flex-wrap: wrap;">
         <span style="font-size: 12px; color: var(--text-muted); margin-right: 4px;">Engine:</span>
         <button id="btn-engine-native" class="btn icon-only active" title="Native Scanner" style="padding: 4px 12px; border-radius: 4px; font-size: 12px; height: 24px; box-shadow: none;">Native</button>
         <button id="btn-engine-nmap" class="btn icon-only" title="Nmap Scanner" style="padding: 4px 12px; border-radius: 4px; font-size: 12px; height: 24px; box-shadow: none;">Nmap</button>
@@ -3248,11 +3248,19 @@ window.electronAPI.onSnmpWalkResult && window.electronAPI.onSnmpWalkResult((resu
   const portSpan = document.createElement('span');
   portSpan.className = 'ds-port';
   portSpan.textContent = result.name || result.oid;
-  
+
+  const typeMap = {
+    2: 'Integer', 4: 'OctetString', 5: 'Null', 6: 'OID', 64: 'IpAddress', 65: 'Counter', 66: 'Gauge', 67: 'TimeTicks', 68: 'Opaque'
+  };
+  const typeStr = typeMap[result.type] || `Type ${result.type}`;
+
   const serviceSpan = document.createElement('span');
   serviceSpan.className = 'ds-service';
-  serviceSpan.textContent = result.type;
-  
+  serviceSpan.style.marginLeft = '8px';
+  serviceSpan.style.opacity = '0.6';
+  serviceSpan.style.fontSize = '0.85em';
+  serviceSpan.textContent = typeStr;
+
   title.appendChild(portSpan);
   title.appendChild(serviceSpan);
   header.appendChild(title);

@@ -66,7 +66,7 @@ export function snmpWalk(targetIp, options, onResult, onProgress, onComplete, on
         }
 
         oidCount++;
-        const oid = varbinds[i].oid.join('.');
+        const oid = Array.isArray(varbinds[i].oid) ? varbinds[i].oid.join('.') : varbinds[i].oid;
         
         // Find best matching name from map, or use numerical
         // For table entries, we want to match the prefix

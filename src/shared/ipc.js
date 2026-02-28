@@ -25,6 +25,15 @@ export const IPC_CHANNELS = {
   DEEP_SCAN_PROGRESS: 'deep-scan-progress',
   DEEP_SCAN_COMPLETE: 'deep-scan-complete',
 
+  // SNMP Walking
+  SNMP_WALK: 'snmp-walk',
+  SNMP_GET: 'snmp-get',
+  CANCEL_SNMP_WALK: 'cancel-snmp-walk',
+  SNMP_WALK_RESULT: 'snmp-walk-result',
+  SNMP_WALK_PROGRESS: 'snmp-walk-progress',
+  SNMP_WALK_COMPLETE: 'snmp-walk-complete',
+  SNMP_WALK_ERROR: 'snmp-walk-error',
+
   // Nmap Channels
   CHECK_NMAP: 'check-nmap',
   RUN_NMAP_SCAN: 'run-nmap-scan',
@@ -82,5 +91,18 @@ export const IPC_CHANNELS = {
 
   // Shared
   PASSIVE_CAPTURE_COMPLETE: 'passive-capture-complete',
-  PASSIVE_STATUS_UPDATE: 'passive-status-update'
+  PASSIVE_STATUS_UPDATE: 'passive-status-update',
+  
+  // Rogue DNS Detection
+  PASSIVE_ROGUE_DNS_ALERT: 'passive-rogue-dns-alert',
+  PASSIVE_ROGUE_DNS_ERROR: 'passive-rogue-dns-error',
+
+  // PCAP Live Capture & Analysis
+  START_PCAP_CAPTURE: 'start-pcap-capture',
+  STOP_PCAP_CAPTURE: 'stop-pcap-capture',
+  ANALYZE_PCAP_FILE: 'analyze-pcap-file',
+  PCAP_PACKET_SUMMARY: 'pcap-packet-summary',
+  PCAP_STATS_UPDATE: 'pcap-stats-update',
+  PCAP_CAPTURE_ERROR: 'pcap-capture-error',
+  PCAP_CAPTURE_COMPLETE: 'pcap-capture-complete',
 };

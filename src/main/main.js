@@ -24,6 +24,7 @@ import { runDeepScan, cancelDeepScan } from './deepScanner.js';
 import { checkNmapInstalled, runNmapScan, cancelNmapScan, runNcat, getNmapScripts } from './nmapScanner.js';
 import { createMainWindow } from './windowManager.js';
 import { parseNmapXml } from './nmapXmlParser.js';
+import { snmpWalk, snmpGet, cancelSnmpWalk } from './snmpWalker.js';
 import ping from 'ping';
 import { getSetting, setSetting, getAllSettings, checkDependency } from './store.js';
 import { startTsharkCapture, stopTsharkCapture } from './tsharkScanner.js';
@@ -33,6 +34,8 @@ import { startDnsHarvesting, stopDnsHarvesting } from './dnsHarvester.js';
 import { startArpDetection, stopArpDetection } from './arpSpoofDetector.js';
 import { exportPcap } from './pcapExporter.js';
 import { stopAll as stopAllPassive } from './passiveCapture.js';
+import { startLiveCapture, stopLiveCapture, analyzePcapFile } from './pcapAnalyzer.js';
+import { startRogueDnsDetection, stopRogueDnsDetection } from './rogueDnsDetector.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -133,6 +136,41 @@ ipcMain.handle(IPC_CHANNELS.CANCEL_DEEP_SCAN, async (event, ip) => {
 
 ipcMain.handle(IPC_CHANNELS.CHECK_NMAP, async () => {
   return await checkNmapInstalled();
+});
+
+// --- SNMP Walking ---
+
+ipcMain.handle(IPC_CHANNELS.SNMP_WALK, async (event, { targetIp, options }) => {
+  console.log(`SNMP Walk requested for ${targetIp}`);
+  const success = snmpWalk(targetIp, options,
+    (resultData) => {
+      if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.SNMP_WALK_RESULT, resultData);
+    },
+    (progressData) => {
+      if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.SNMP_WALK_PROGRESS, progressData);
+    },
+    (completeData) => {
+      if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.SNMP_WALK_COMPLETE, completeData);
+    },
+    (errorData) => {
+      if (mainWindow) mainWindow.webContents.send(IPC_CHANNELS.SNMP_WALK_ERROR, errorData);
+    }
+  );
+  return { status: success ? 'started' : 'failed' };
+});
+
+ipcMain.handle(IPC_CHANNELS.SNMP_GET, async (event, { targetIp, oids, options }) => {
+  try {
+    const results = await snmpGet(targetIp, oids, options);
+    return { success: true, results };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle(IPC_CHANNELS.CANCEL_SNMP_WALK, async (event, targetIp) => {
+  const success = cancelSnmpWalk(targetIp);
+  return { status: success ? 'cancelled' : 'not_found' };
 });
 
 // --- Settings Management ---
@@ -287,7 +325,8 @@ ipcMain.handle(IPC_CHANNELS.START_PASSIVE_CAPTURE, async (event, { moduleId, int
       'dhcp': IPC_CHANNELS.PASSIVE_DHCP_ERROR,
       'creds': IPC_CHANNELS.PASSIVE_CRED_ERROR,
       'dns': IPC_CHANNELS.PASSIVE_DNS_ERROR,
-      'arp': IPC_CHANNELS.PASSIVE_ARP_ERROR
+      'arp': IPC_CHANNELS.PASSIVE_ARP_ERROR,
+      'rogue-dns': IPC_CHANNELS.PASSIVE_ROGUE_DNS_ERROR
     };
     if (mainWindow && channelMap[moduleId]) {
       mainWindow.webContents.send(channelMap[moduleId], errorMsg);
@@ -318,6 +357,19 @@ ipcMain.handle(IPC_CHANNELS.START_PASSIVE_CAPTURE, async (event, { moduleId, int
       (alert) => mainWindow?.webContents.send(IPC_CHANNELS.PASSIVE_ARP_ALERT, alert),
       onError, onComplete
     );
+  } else if (moduleId === 'rogue-dns') {
+    success = startRogueDnsDetection(interfaceId,
+      (alert) => mainWindow?.webContents.send(IPC_CHANNELS.PASSIVE_ROGUE_DNS_ALERT, alert),
+      onError, onComplete
+    );
+  } else if (moduleId === 'pcap') {
+    startLiveCapture(interfaceId, options?.host, options,
+      (summary) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_PACKET_SUMMARY, summary),
+      (stats) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_STATS_UPDATE, stats),
+      onError,
+      (msg) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_CAPTURE_COMPLETE, msg)
+    );
+    success = true; // startLiveCapture handles its own async process and errors
   }
 
   return { status: success ? 'started' : 'failed' };
@@ -330,6 +382,11 @@ ipcMain.handle(IPC_CHANNELS.STOP_PASSIVE_CAPTURE, async (event, moduleId) => {
   else if (moduleId === 'creds') stopped = stopCredentialSniffing();
   else if (moduleId === 'dns') stopped = stopDnsHarvesting();
   else if (moduleId === 'arp') stopped = stopArpDetection();
+  else if (moduleId === 'rogue-dns') stopped = stopRogueDnsDetection();
+  else if (moduleId === 'pcap') {
+    stopLiveCapture();
+    stopped = true;
+  }
   
   return { status: stopped ? 'stopped' : 'not_running' };
 });
@@ -350,6 +407,36 @@ ipcMain.handle(IPC_CHANNELS.EXPORT_PCAP, async (event, { interfaceId, hostIp, du
     (data) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_EXPORT_COMPLETE, data),
     (err) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_EXPORT_ERROR, err)
   );
+});
+
+// --- PCAP Live Capture & Analysis ---
+
+ipcMain.handle(IPC_CHANNELS.START_PCAP_CAPTURE, async (event, { interfaceId, hostIp, options }) => {
+  console.log(`Starting PCAP live capture on ${interfaceId} for ${hostIp || 'all'}`);
+  startLiveCapture(interfaceId, hostIp, options,
+    (summary) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_PACKET_SUMMARY, summary),
+    (stats) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_STATS_UPDATE, stats),
+    (err) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_CAPTURE_ERROR, err),
+    (msg) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_CAPTURE_COMPLETE, msg)
+  );
+  return { status: 'started' };
+});
+
+ipcMain.handle(IPC_CHANNELS.STOP_PCAP_CAPTURE, async () => {
+  console.log('Stopping PCAP live capture');
+  stopLiveCapture();
+  return { status: 'stopped' };
+});
+
+ipcMain.handle(IPC_CHANNELS.ANALYZE_PCAP_FILE, async (event, filePath) => {
+  console.log(`Analyzing PCAP file: ${filePath}`);
+  analyzePcapFile(filePath,
+    (summary) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_PACKET_SUMMARY, summary),
+    (stats) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_STATS_UPDATE, stats),
+    (err) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_CAPTURE_ERROR, err),
+    (msg) => mainWindow?.webContents.send(IPC_CHANNELS.PCAP_CAPTURE_COMPLETE, msg)
+  );
+  return { status: 'started' };
 });
 
 // --- Results Management ---

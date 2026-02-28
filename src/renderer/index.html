@@ -128,6 +128,8 @@
               style="padding: 4px 8px; border-radius: 4px; box-shadow: none;">☰</button>
             <button id="btn-view-table" class="btn icon-only" title="Table View"
               style="padding: 4px 8px; border-radius: 4px; box-shadow: none;">🗄️</button>
+            <button id="btn-view-topology" class="btn icon-only" title="Topology View"
+              style="padding: 4px 8px; border-radius: 4px; box-shadow: none;">📡</button>
           </div>
         </div>
       </div>
@@ -136,7 +138,97 @@
     <!-- Split View Container -->
     <div class="split-view-container" style="display: flex; flex-grow: 1; overflow: hidden; gap: 0;">
       <!-- Dashboard Grid -->
-      <main class="dashboard-scroll" style="flex-grow: 1;">
+      <main class="dashboard-scroll" style="flex-grow: 1; position: relative;">
+        <!-- Topology Container -->
+        <div id="topology-container" class="topology-area"
+          style="display: none; width: 100%; height: 100%; position: absolute; inset: 0;">
+          <div class="topology-toolbar"
+            style="position: absolute; top: 16px; left: 16px; z-index: 10; display: flex; gap: 8px; background: rgba(0,0,0,0.6); padding: 8px; border-radius: 8px; backdrop-filter: blur(4px); border: 1px solid var(--border-glass);">
+            <select id="topology-layout" class="dropdown-select">
+              <option value="cose-bilkent">Force Directed</option>
+              <option value="cola">Fluid (Cola)</option>
+              <option value="concentric">Concentric</option>
+              <option value="circle">Circle</option>
+              <option value="grid">Grid</option>
+            </select>
+            <button id="btn-topology-fit" class="btn secondary icon-only" title="Fit to Screen">🔍</button>
+            <button id="btn-topology-export" class="btn secondary icon-only" title="Export as PNG">🖼️</button>
+          </div>
+
+          <div class="topology-legend"
+            style="position: absolute; bottom: 16px; left: 16px; z-index: 10; background: rgba(0,0,0,0.6); padding: 12px; border-radius: 8px; backdrop-filter: blur(4px); font-size: 11px; color: var(--text-muted); border: 1px solid var(--border-glass); pointer-events: none; max-height: 300px; overflow-y: auto;">
+            <div style="font-weight: 600; color: white; margin-bottom: 8px;">Legend</div>
+            <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 6px;">
+              <span
+                style="display: inline-block; width: 14px; height: 14px; border: 1.5px solid #9b59b6; background: #1f2030; border-radius: 50%;"></span>
+              Endpoint
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 6px;">
+              <span
+                style="display: inline-block; width: 14px; height: 14px; border: 1.5px solid #3498db; background: #1f2030; border-radius: 50%;"></span>
+              Router/Gateway
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 6px;">
+              <span
+                style="display: inline-block; width: 14px; height: 14px; border: 1.5px solid #e67e22; background: #1f2030; border-radius: 50%;"></span>
+              Switch
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 6px;">
+              <span
+                style="display: inline-block; width: 14px; height: 14px; border: 1.5px solid #1abc9c; background: #1f2030; border-radius: 50%;"></span>
+              Phone/Mobile
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 6px;">
+              <span
+                style="display: inline-block; width: 14px; height: 14px; border: 1.5px solid #95a5a6; background: #1f2030; border-radius: 50%;"></span>
+              Printer
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 6px;">
+              <span
+                style="display: inline-block; width: 14px; height: 14px; border: 1.5px solid #f1c40f; background: #1f2030; border-radius: 50%;"></span>
+              WAP
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 6px;">
+              <span
+                style="display: inline-block; width: 14px; height: 14px; border: 1.5px solid #e74c3c; background: #1f2030; border-radius: 50%;"></span>
+              Game Console
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 6px;">
+              <span
+                style="display: inline-block; width: 14px; height: 14px; border: 1.5px solid #fd79a8; background: #1f2030; border-radius: 50%;"></span>
+              Media Device
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 6px;">
+              <span
+                style="display: inline-block; width: 14px; height: 14px; border: 1.5px solid #34495e; background: #1f2030; border-radius: 50%;"></span>
+              Storage/NAS
+            </div>
+
+            <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+              <div
+                style="display: flex; gap: 12px; align-items: center; margin-bottom: 6px; color: #eb5e5e; font-weight: 600;">
+                🛑 Critical/High Vulns
+              </div>
+              <div
+                style="display: flex; gap: 12px; align-items: center; margin-bottom: 6px; color: #f39c12; font-weight: 600;">
+                ⚠️ Warnings/Exposures
+              </div>
+            </div>
+
+            <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+              <span
+                style="display: inline-block; width: 16px; height: 3px; background: #3be282; margin-right: 8px; vertical-align: text-bottom; border-radius: 2px;"></span>
+              Subnet Link<br>
+              <div style="height: 6px;"></div>
+              <span
+                style="display: inline-block; width: 16px; height: 3px; background: #3498db; margin-right: 8px; vertical-align: text-bottom; border-radius: 2px;"></span>
+              Gateway Route
+            </div>
+          </div>
+
+          <div id="cy" style="width: 100%; height: 100%;"></div>
+        </div>
+
         <div id="host-grid" class="host-grid">
           <!-- Dynamically populated Host Cards will go here -->
 
@@ -304,6 +396,20 @@
                 style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 10px;">0</span>
             </div>
           </div>
+          <!-- Rogue DNS -->
+          <div class="passive-module-card glass-panel"
+            style="padding: 12px; border: 1px solid var(--border-glass); border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-weight: 500; font-size: 13px;">Rogue DNS</span>
+              <label class="toggle-switch small"><input type="checkbox" id="toggle-rogue-dns"><span
+                  class="slider"></span></label>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+              <span id="status-rogue-dns" class="passive-status">Idle</span>
+              <span class="badge" id="badge-rogue-dns"
+                style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 10px;">0</span>
+            </div>
+          </div>
         </div>
 
         <!-- Credential Disclaimer Banner -->
@@ -324,6 +430,8 @@
           <button class="modal-tab" data-passive-tab="creds">Creds</button>
           <button class="modal-tab" data-passive-tab="dns">DNS</button>
           <button class="modal-tab" data-passive-tab="arp">ARP</button>
+          <button class="modal-tab" data-passive-tab="rogue-dns">Rogue DNS</button>
+          <button class="modal-tab" data-passive-tab="pcap">PCAP</button>
         </div>
 
         <div style="border-top: 1px solid var(--border-glass); padding-top: 16px; flex-grow: 1; overflow-y: auto;">
@@ -377,6 +485,65 @@
             <div id="passive-results-arp" style="display: flex; flex-direction: column; gap: 8px;">
               <div class="ds-record" style="text-align:center; color: var(--text-muted); opacity: 0.7;">Waiting for ARP
                 data...</div>
+            </div>
+          </div>
+
+          <div id="tab-passive-rogue-dns" class="passive-tab-pane" style="display: none;">
+            <div id="passive-results-rogue-dns" style="display: flex; flex-direction: column; gap: 8px;">
+              <div class="ds-record" style="text-align:center; color: var(--text-muted); opacity: 0.7;">Waiting for
+                Rogue DNS
+                data...</div>
+            </div>
+          </div>
+
+          <div id="tab-passive-pcap" class="passive-tab-pane" style="display: none;">
+            <div style="display: flex; gap: 8px; margin-bottom: 4px; align-items: center;">
+              <input type="text" id="live-pcap-host" class="text-input" placeholder="Host Filter (e.g. 192.168.1.1)"
+                style="flex-grow: 1;"
+                title="Note: On switched networks, you will only capture traffic to/from your own machine or broadcast/multicast traffic unless using port mirroring.">
+              <input type="number" id="live-pcap-duration" class="text-input" value="60" style="width: 70px;"
+                title="Duration (s)">
+            </div>
+            <div style="font-size: 10.5px; color: var(--text-muted); margin-bottom: 12px; padding-left: 2px;">
+              ℹ️ Note: On switched networks, you will only capture broadcast/multicast or traffic directly to/from your
+              own machine.
+            </div>
+            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+              <input type="text" id="live-pcap-bpf" class="text-input" placeholder="Custom BPF (e.g. tcp port 80)"
+                style="flex-grow: 1;">
+              <button id="btn-start-live-pcap" class="btn primary icon-only" title="Start Capture">▶️</button>
+              <button id="btn-stop-live-pcap" class="btn danger-outline icon-only" title="Stop Capture"
+                disabled>🛑</button>
+            </div>
+            <div id="live-pcap-stats-dashboard"
+              style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center;">
+              <div id="live-pcap-total-stats" style="font-size: 11px; flex-grow: 1; color: var(--primary);">0 Packets /
+                0
+                Bytes</div>
+              <button id="btn-import-live-pcap" class="btn secondary" style="font-size: 11px;">Import .pcap</button>
+            </div>
+            <div id="live-pcap-warnings"
+              style="color: var(--danger); font-size: 11px; margin-bottom: 8px; min-height: 14px;"></div>
+            <div
+              style="height: 300px; overflow-y: auto; border: 1px solid var(--border-glass); border-radius: 4px; background: rgba(0,0,0,0.3);">
+              <table class="data-table" style="width: 100%; font-size: 10px; table-layout: fixed;">
+                <thead style="position: sticky; top: 0; background: #16161c; z-index: 1;">
+                  <tr>
+                    <th style="width: 60px;">Time</th>
+                    <th style="width: 80px;">Source</th>
+                    <th style="width: 80px;">Dest</th>
+                    <th style="width: 45px;">Proto</th>
+                    <th style="width: 45px;">Len</th>
+                    <th style="width: auto;">Info</th>
+                  </tr>
+                </thead>
+                <tbody id="live-pcap-results">
+                  <tr>
+                    <td colspan="6" style="text-align:center; color: var(--text-muted); padding: 12px;">Waiting for
+                      capture...</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 

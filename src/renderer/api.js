@@ -10,6 +10,12 @@ export const api = {
   runNmapScan: async (type, targetObj) => window.electronAPI.runNmapScan(type, targetObj),
   cancelNmapScan: async (target) => window.electronAPI.cancelNmapScan(target),
   runNcat: async (payloadObj) => window.electronAPI.runNcat(payloadObj),
+  
+  // SNMP Walking
+  snmpWalk: async (targetIp, options) => window.electronAPI.snmpWalk(targetIp, options),
+  snmpGet: async (targetIp, oids, options) => window.electronAPI.snmpGet(targetIp, oids, options),
+  cancelSnmpWalk: async (targetIp) => window.electronAPI.cancelSnmpWalk(targetIp),
+
   saveResults: async (results) => window.electronAPI.saveResults(results),
   loadResults: async () => window.electronAPI.loadResults(),
   clearResults: async () => window.electronAPI.clearResults(),
@@ -36,5 +42,10 @@ export const api = {
   startPassiveCapture: async (moduleId, interfaceId, options) => window.electronAPI.startPassiveCapture(moduleId, interfaceId, options),
   stopPassiveCapture: async (moduleId) => window.electronAPI.stopPassiveCapture(moduleId),
   stopAllPassive: async () => window.electronAPI.stopAllPassive(),
-  exportPcap: async (payload) => window.electronAPI.exportPcap(payload)
+  exportPcap: async (payload) => window.electronAPI.exportPcap(payload),
+
+  // PCAP Live Capture & Analysis
+  startPcapCapture: async (interfaceId, hostIp, options) => window.electronAPI.startPcapCapture(interfaceId, hostIp, options),
+  stopPcapCapture: async () => window.electronAPI.stopPcapCapture(),
+  analyzePcapFile: async (filePath) => window.electronAPI.analyzePcapFile(filePath)
 };

@@ -1497,3 +1497,9 @@ body {
 .btn-promote:hover {
   background: rgba(94, 114, 235, 0.4);
 }
+
+/* --- SNMP Walk Styles --- */
+@keyframes progress-indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}

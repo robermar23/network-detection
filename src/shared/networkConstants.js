@@ -113,3 +113,73 @@ export function expandCIDR(cidr) {
   }
   return ips;
 }
+
+// Default SNMP ports
+export const SNMP_PORTS = { SNMP: 161, SNMP_TRAP: 162 };
+
+// Standard SNMP community strings to try
+export const DEFAULT_COMMUNITIES = ['public', 'private', 'community'];
+
+// Common OID prefixes with human-readable names
+export const SNMP_OID_MAP = {
+  // System Group
+  '1.3.6.1.2.1.1.1': 'sysDescr',
+  '1.3.6.1.2.1.1.2': 'sysObjectID',
+  '1.3.6.1.2.1.1.3': 'sysUpTime',
+  '1.3.6.1.2.1.1.4': 'sysContact',
+  '1.3.6.1.2.1.1.5': 'sysName',
+  '1.3.6.1.2.1.1.6': 'sysLocation',
+  '1.3.6.1.2.1.1.7': 'sysServices',
+  
+  // Interfaces Group (ifTable)
+  '1.3.6.1.2.1.2.2.1.1': 'ifIndex',
+  '1.3.6.1.2.1.2.2.1.2': 'ifDescr',
+  '1.3.6.1.2.1.2.2.1.3': 'ifType',
+  '1.3.6.1.2.1.2.2.1.4': 'ifMtu',
+  '1.3.6.1.2.1.2.2.1.5': 'ifSpeed',
+  '1.3.6.1.2.1.2.2.1.6': 'ifPhysAddress',
+  '1.3.6.1.2.1.2.2.1.7': 'ifAdminStatus',
+  '1.3.6.1.2.1.2.2.1.8': 'ifOperStatus',
+  '1.3.6.1.2.1.2.2.1.9': 'ifLastChange',
+  '1.3.6.1.2.1.2.2.1.10': 'ifInOctets',
+  '1.3.6.1.2.1.2.2.1.16': 'ifOutOctets',
+
+  // IP Route Table (ipRouteTable)
+  '1.3.6.1.2.1.4.21.1.1': 'ipRouteDest',
+  '1.3.6.1.2.1.4.21.1.2': 'ipRouteIfIndex',
+  '1.3.6.1.2.1.4.21.1.3': 'ipRouteMetric1',
+  '1.3.6.1.2.1.4.21.1.7': 'ipRouteNextHop',
+  '1.3.6.1.2.1.4.21.1.8': 'ipRouteType',
+  '1.3.6.1.2.1.4.21.1.11': 'ipRouteMask',
+
+  // IP Address Table (ipAddrTable)
+  '1.3.6.1.2.1.4.20.1.1': 'ipAdEntAddr',
+  '1.3.6.1.2.1.4.20.1.2': 'ipAdEntIfIndex',
+  '1.3.6.1.2.1.4.20.1.3': 'ipAdEntNetMask',
+
+  // ARP Table (atTable / ipNetToMediaTable)
+  '1.3.6.1.2.1.3.1.1.1': 'atIfIndex',
+  '1.3.6.1.2.1.3.1.1.2': 'atPhysAddress',
+  '1.3.6.1.2.1.3.1.1.3': 'atNetAddress',
+  '1.3.6.1.2.1.4.22.1.1': 'ipNetToMediaIfIndex',
+  '1.3.6.1.2.1.4.22.1.2': 'ipNetToMediaPhysAddress',
+  '1.3.6.1.2.1.4.22.1.3': 'ipNetToMediaNetAddress',
+  '1.3.6.1.2.1.4.22.1.4': 'ipNetToMediaType',
+
+  // Host Resources (hrDeviceTable)
+  '1.3.6.1.2.1.25.3.2.1.1': 'hrDeviceIndex',
+  '1.3.6.1.2.1.25.3.2.1.2': 'hrDeviceType',
+  '1.3.6.1.2.1.25.3.2.1.3': 'hrDeviceDescr',
+  '1.3.6.1.2.1.25.3.2.1.5': 'hrDeviceStatus',
+
+  // Hardware/Firmware Entity MIB (entPhysicalTable)
+  '1.3.6.1.2.1.47.1.1.1.1.1': 'entPhysicalIndex',
+  '1.3.6.1.2.1.47.1.1.1.1.2': 'entPhysicalDescr',
+  '1.3.6.1.2.1.47.1.1.1.1.7': 'entPhysicalName',
+  '1.3.6.1.2.1.47.1.1.1.1.8': 'entPhysicalHardwareRev',
+  '1.3.6.1.2.1.47.1.1.1.1.9': 'entPhysicalFirmwareRev',
+  '1.3.6.1.2.1.47.1.1.1.1.10': 'entPhysicalSoftwareRev',
+  '1.3.6.1.2.1.47.1.1.1.1.11': 'entPhysicalSerialNum',
+  '1.3.6.1.2.1.47.1.1.1.1.12': 'entPhysicalMfgName',
+  '1.3.6.1.2.1.47.1.1.1.1.13': 'entPhysicalModelName'
+};

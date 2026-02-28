@@ -157,7 +157,43 @@ NetSpecter also features a powerful **Passive Intelligence** suite backed by Tsh
    * **ARP Spoofing Detection**: Monitors ARP replies to instantly detect Man-in-the-Middle (MitM) ARP poisoning attacks and gratuitous ARP announcements.
 4. **PCAP Export**: Need raw packet data? Click the **📥 Export PCAP...** button to spawn a targeted packet capture saved directly to your hard drive, ready for Wireshark analysis.
 
-## 10. Persisting Data (Saving and Loading)
+## 10. SNMP Device Walking
+
+NetSpecter supports SNMPv1, v2c, and v3 walking to extract detailed operational metrics from routers, switches, and local servers.
+
+1. Ensure the target host is running an SNMP agent (e.g., `snmpd`).
+2. Click on the host in the main dashboard to open the **Details Panel**.
+3. Under the "Actions" section, click **SNMP Walk**.
+4. Configure the SNMP Version and Community String (for v1/v2c) or Security/Auth parameters (for v3).
+5. Click **Start Walk**. NetSpecter will concurrently pull Interface Statistics, System Descriptions, Routing Tables, and ARP caches.
+
+## 11. Network Topology Map
+
+Transform your flat host grid into an interactive visual graph to understand network topology at a glance.
+
+1. Discover hosts on your subnet using the standard native scan.
+2. In the top navigation bar, click the **📡 Topology** tab.
+3. Your network will be automatically rendered using Cytoscape.js. Subnets are clustered, and hosts are linked to their respective detected gateways.
+4. Interact with the graph: Click nodes to open their Host Details, use the toolbar to switch layouts (Force-directed, Hierarchical), or export the graph via the **Camera** icon.
+
+## 12. Live Packet Capture & Analysis
+
+Need deeper forensic visibility into a specific machine? NetSpecter integrates live `tshark` capture capabilities directly into the UI.
+
+1. Navigate to the **Passive Intelligence** panel, or right-click any host in the grid and select **Capture Packets**.
+2. Set a Capture Filter (e.g. `host 192.168.1.5` or `tcp port 80`) and Duration.
+3. Click **Start Capture**.
+4. The panel will stream packets in real-time. The **Stats Dashboard** instantly categorizes protocol distributions (TCP, UDP, ICMP), identifies Top Talkers, and alerts you to any Cleartext Protocols (like HTTP or FTP) detected on the wire.
+
+## 13. Rogue DNS Detection
+
+Similar to Rogue DHCP, the Rogue DNS module passively hunts for unauthorized name servers or DNS spoofing.
+
+1. Open the **🕵️ Passive Intelligence** panel.
+2. Toggle on the **🌐 Rogue DNS** module.
+3. NetSpecter will establish a baseline of trusted DNS responders. If an unexpected server responds, or if conflicting A records are offered within a short window, a high-severity alert card is injected into the dashboard natively.
+
+## 14. Persisting Data (Saving and Loading)
 
 Any Nmap Scans, NSE Explorations, and Native Port Banners queried in the current application state session are saved in the DOM.
 

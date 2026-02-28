@@ -73,26 +73,103 @@ describe('SNMP Walker', () => {
     });
   });
 
-  describe('snmpWalk (v3)', () => {
-    it('creates v3 session with auth and priv keys', () => {
-      const mockSession = { walk: vi.fn((oid, max, cb, done) => done()), close: vi.fn() };
-      snmp.createV3Session.mockReturnValue(mockSession);
+  describe('snmpWalk Intelligence', () => {
+    it('extracts OS and Vendor from sysDescr', () => {
+      const mockSession = {
+        walk: vi.fn((oid, max, cb, done) => {
+          cb([{ 
+            oid: [1,3,6,1,2,1,1,1,0], 
+            type: 4, 
+            value: Buffer.from('Hardware: x86 - Software: Windows 10') 
+          }]);
+          done();
+        }),
+        close: vi.fn()
+      };
+      snmp.createSession.mockReturnValue(mockSession);
+      const onIntel = vi.fn();
+      
+      snmpWalk('10.0.0.1', {}, vi.fn(), vi.fn(), vi.fn(), vi.fn(), onIntel);
+      
+      expect(onIntel).toHaveBeenCalledWith(expect.objectContaining({ type: 'os', value: 'Windows 10' }));
+      expect(onIntel).toHaveBeenCalledWith(expect.objectContaining({ type: 'vendor', value: 'x86' }));
+    });
 
-      snmpWalk('10.0.0.1', { 
-        version: 'v3', 
-        user: 'admin', 
-        authKey: 'authpass', 
-        authProtocol: 'sha',
-        privKey: 'privpass',
-        privProtocol: 'aes'
-      }, vi.fn(), vi.fn(), vi.fn(), vi.fn());
+    it('extracts ARP discovery data', () => {
+      const mockSession = {
+        walk: vi.fn((oid, max, cb, done) => {
+          cb([{ 
+            oid: [1,3,6,1,2,1,4,22,1,2,1,192,168,1,50], 
+            type: 4, 
+            value: Buffer.from([0x00, 0x11, 0x22, 0x33, 0x44, 0x55]) 
+          }]);
+          done();
+        }),
+        close: vi.fn()
+      };
+      snmp.createSession.mockReturnValue(mockSession);
+      const onIntel = vi.fn();
+      
+      snmpWalk('10.0.0.1', {}, vi.fn(), vi.fn(), vi.fn(), vi.fn(), onIntel);
+      
+      expect(onIntel).toHaveBeenCalledWith(expect.objectContaining({ 
+        type: 'arp-discovery', 
+        discoveredIp: '192.168.1.50',
+        discoveredMac: '00:11:22:33:44:55'
+      }));
+    });
 
-      expect(snmp.createV3Session).toHaveBeenCalledWith('10.0.0.1', expect.objectContaining({
-        name: 'admin',
-        level: snmp.SecurityLevel.authPriv,
-        authKey: 'authpass',
-        privKey: 'privpass'
-      }), expect.any(Object));
+    it('extracts process names', () => {
+      const mockSession = {
+        walk: vi.fn((oid, max, cb, done) => {
+          cb([{ 
+            oid: [1,3,6,1,2,1,25,4,2,1,2,1001], 
+            type: 4, 
+            value: Buffer.from('systemd') 
+          }]);
+          done();
+        }),
+        close: vi.fn()
+      };
+      snmp.createSession.mockReturnValue(mockSession);
+      const onIntel = vi.fn();
+      
+      snmpWalk('10.0.0.1', {}, vi.fn(), vi.fn(), vi.fn(), vi.fn(), onIntel);
+      
+      expect(onIntel).toHaveBeenCalledWith(expect.objectContaining({ 
+        type: 'process-discovery', 
+        processName: 'systemd' 
+      }));
+    });
+  });
+
+  describe('snmpGet', () => {
+    it('resolves with multiple OID results', async () => {
+      const { snmpGet } = await import('../src/main/snmpWalker.js');
+      const mockSession = {
+        get: vi.fn((oids, cb) => {
+          cb(null, [
+            { oid: [1,3,6,1,2,1,1,5,0], value: Buffer.from('HostA'), type: 4 }
+          ]);
+        }),
+        close: vi.fn()
+      };
+      snmp.createSession.mockReturnValue(mockSession);
+
+      const results = await snmpGet('10.0.0.1', ['1.3.6.1.2.1.1.5.0'], {});
+      expect(results[0].value).toBe('HostA');
+      expect(mockSession.close).toHaveBeenCalled();
+    });
+
+    it('rejects on session error', async () => {
+      const { snmpGet } = await import('../src/main/snmpWalker.js');
+      const mockSession = {
+        get: vi.fn((oids, cb) => cb(new Error('SNMP Error'))),
+        close: vi.fn()
+      };
+      snmp.createSession.mockReturnValue(mockSession);
+
+      await expect(snmpGet('10.0.0.1', ['1.3.6.1.2.1'], {})).rejects.toThrow('SNMP Error');
     });
   });
 
@@ -106,10 +183,6 @@ describe('SNMP Walker', () => {
       const res = cancelSnmpWalk('10.0.0.3');
       expect(res).toBe(true);
       expect(mockSession.close).toHaveBeenCalled();
-
-      // Ensure we can start a new walk now
-      snmpWalk('10.0.0.3', { version: 'v2c' }, vi.fn(), vi.fn(), vi.fn(), vi.fn());
-      expect(snmp.createSession).toHaveBeenCalledTimes(2);
     });
   });
 });

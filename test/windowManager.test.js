@@ -124,10 +124,30 @@ describe('Window Manager', () => {
     expect(opts.minHeight).toBe(600);
   });
 
-  it('should show window as hidden initially', () => {
+  it('should show window on ready-to-show', () => {
     const resolvePath = vi.fn((p) => `/fake/path/${p}`);
-    createMainWindow(false, resolvePath);
-    const opts = _mockInstances[0]._opts;
-    expect(opts.show).toBe(false);
+    const win = createMainWindow(false, resolvePath);
+    
+    // Trigger the 'ready-to-show' callback
+    const readyCallback = win._onceHandlers['ready-to-show'][0];
+    readyCallback();
+    
+    expect(win.show).toHaveBeenCalled();
+  });
+
+  it('should debounce saving bounds on resize', async () => {
+    vi.useFakeTimers();
+    const resolvePath = vi.fn((p) => `/fake/path/${p}`);
+    const win = createMainWindow(false, resolvePath);
+    
+    // Trigger resize
+    const resizeCallback = win._onHandlers['resize'][0];
+    resizeCallback();
+    
+    // Fast-forward time
+    vi.advanceTimersByTime(500);
+    
+    expect(win.getBounds).toHaveBeenCalled();
+    vi.useRealTimers();
   });
 });
